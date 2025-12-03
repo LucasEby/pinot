@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.queries;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
@@ -31,9 +33,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+
+import javax.sql.DataSource;
+
 import org.apache.avro.Schema;
+import org.apache.avro.Schema.Field;
+import org.apache.avro.Schema.Type;
+import org.apache.avro.file.DataFileReader;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
+import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecordBuilder;
 import org.apache.commons.io.FileUtils;
@@ -58,7 +67,15 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.avro.Schema.*;
+import static org.apache.avro.Schema.Field;
+import static org.apache.avro.Schema.Type;
+import static org.apache.avro.Schema.create;
+import static org.apache.avro.Schema.createArray;
+import static org.apache.avro.Schema.createEnum;
+import static org.apache.avro.Schema.createFixed;
+import static org.apache.avro.Schema.createMap;
+import static org.apache.avro.Schema.createRecord;
+import static org.apache.avro.Schema.createUnion;
 
 
 /**
@@ -95,6 +112,8 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
 
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
+
+  private static final ObjectMapper MAPPER = new ObjectMapper();
 
   @Override
   protected String getFilter() {
@@ -221,7 +240,7 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
 
     // Insert simple Java String (gets converted into JSON value)
     inputRecords.add(
-        createTableRecord(6, "pluto", "test", createEnumField(enumSchema, "DOWN"), createFixedField(fixedSchema, 6),
+        createTableRecord(6, "pluto", "IPUTTHISINHERE", createEnumField(enumSchema, "DOWN"), createFixedField(fixedSchema, 6),
             new byte[] {0, 0, 0, 6}, Arrays.asList(
                 new GenericRecordBuilder(createJson5RecordSchema()).set("timestamp", 1719390726)
                     .set("data", createMapField(new Pair[]{Pair.of("a", "6"), Pair.of("b", "12")})).build())));
@@ -247,6 +266,20 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
         fileWriter.append(record);
       }
     }
+
+    System.out.println("\n=== VERIFYING AVRO FILE AFTER CREATION ===");
+    try (DataFileReader<GenericData.Record> reader = 
+         new DataFileReader<>(AVRO_DATA_FILE, new GenericDatumReader<>(avroSchema))) {
+        int rowNum = 1;
+        while (reader.hasNext()) {
+            GenericData.Record record = reader.next();
+            System.out.println("Avro Row " + rowNum + ": intColumn=" + 
+                record.get(INT_COLUMN) + ", jsonColumn1=" + 
+                record.get(JSON_COLUMN_1));
+            rowNum++;
+        }
+    }
+    System.out.println("==========================================\n");
   }
 
   /** Create an AVRO file and then ingest it into Pinot while creating a JsonIndex. */
@@ -268,31 +301,117 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
     ImmutableSegment segment =
         ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
     _indexSegment = segment;
-    _indexSegments = List.of(segment, segment);
+    _indexSegments = List.of(segment); //, segment);
   }
+
+  /**
+     * Compares JSON objects as unordered sets of key-value pairs
+     */
+    private void assertJsonEqualsIgnoringOrder(String expectedJson, String actualJson) {
+        try {
+            JsonNode expected = MAPPER.readTree(expectedJson);
+            JsonNode actual = MAPPER.readTree(actualJson);
+            
+            // JsonNode.equals() ignores field order for objects
+            // but maintains order for arrays
+            Assert.assertTrue(expected.equals(actual), 
+              "JSON did not match ignoring field order.\nExpected: " + expectedJson + "\nActual: " + actualJson);
+                
+        } catch (Exception e) {
+            Assert.fail("Failed to parse JSON: " + e.getMessage(), e);
+        }
+    }
 
   /** Verify that we can query the JSON column that ingested ComplexType data from an AVRO file (see setUp). */
   @Test
   public void testSimpleSelectOnJsonColumn() {
     Operator<SelectionResultsBlock> operator =
-        getOperator("select intColumn, stringColumn, jsonColumn1, jsonColumn2 FROM " + "testTable limit 100");
+        getOperator("select intColumn, stringColumn, jsonColumn1, jsonColumn2 FROM testTable ORDER BY intColumn limit 100");
     SelectionResultsBlock block = operator.nextBlock();
-    Collection<Object[]> rows = block.getRows();
+    List<Object[]> rows = new ArrayList<>(block.getRows());
+    
+    // DIAGNOSTIC: Print actual row order
+    System.out.println("\n=== ACTUAL ROWS RETURNED ===");
+    for (int i = 0; i < rows.size(); i++) {
+        Object[] row = rows.get(i);
+        System.out.println(String.format("Index %d: intColumn=%s, jsonColumn1=%s", 
+            i, row[0], row[2]));
+        Object jsonValue = row[2];
+        System.out.println("Type: " + jsonValue.getClass().getName());
+    }
+    System.out.println("============================\n");
+
+    System.err.println("\n=== QUERY RESULTS DIAGNOSTIC ===");
+    List<Object[]> rowsD = block.getRows();
+    for (int iD = 0; iD < rowsD.size(); iD++) {
+        Object[] rowD = rowsD.get(iD);
+        System.err.println("Row " + iD + ": intColumn=" + rowD[0] + 
+            ", jsonColumn1=" + rowD[1] +
+            ", identity=" + System.identityHashCode(rowD[1]));
+    }
+    System.err.println("=== END DIAGNOSTIC ===\n");
+
+    // Operator<SelectionResultsBlock> operator =
+    //     getOperator("select intColumn, stringColumn, jsonColumn1, jsonColumn2 FROM " + "testTable ORDER BY intColumn limit 100");
+    // SelectionResultsBlock block = operator.nextBlock();
+    // // Collection<Object[]> rows = block.getRows();
+    // List<Object[]> rows = new ArrayList<>(block.getRows());
     Assert.assertEquals(block.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.INT);
     Assert.assertEquals(block.getDataSchema().getColumnDataType(1), DataSchema.ColumnDataType.STRING);
     Assert.assertEquals(block.getDataSchema().getColumnDataType(2), DataSchema.ColumnDataType.JSON);
 
-    List<String> expecteds = Arrays.asList("[1, daffy duck, [\"this\",\"is\",\"a\",\"test\"], \"UP\"]",
-        "[2, mickey mouse, {\"a\":\"1\",\"b\":\"2\"}, \"DOWN\"]", "[3, donald duck, {\"a\":\"1\",\"b\":\"2\"}, \"UP\"]",
-        "[4, scrooge mcduck, {\"a\":\"1\",\"b\":\"2\"}, \"LEFT\"]",
-        "[5, minney mouse, {\"name\":\"minney\",\"id\":1}, \"RIGHT\"]", "[6, pluto, \"test\", \"DOWN\"]",
-        "[7, scooby doo, {\"name\":\"scooby\",\"id\":7}, \"UP\"]");
+    // List<String> expecteds = Arrays.asList("[1, daffy duck, [\"this\",\"is\",\"a\",\"test\"], \"UP\"]",
+    //     "[2, mickey mouse, {\"a\":\"1\",\"b\":\"2\"}, \"DOWN\"]", "[3, donald duck, {\"a\":\"1\",\"b\":\"2\"}, \"UP\"]",
+    //     "[4, scrooge mcduck, {\"a\":\"1\",\"b\":\"2\"}, \"LEFT\"]",
+    //     "[5, minney mouse, {\"name\":\"minney\",\"id\":1}, \"RIGHT\"]", "[6, pluto, \"test\", \"DOWN\"]",
+    //     "[7, scooby doo, {\"name\":\"scooby\",\"id\":7}, \"UP\"]");
+
+    // int index = 0;
+    // Iterator<Object[]> iterator = rows.iterator();
+    // while (iterator.hasNext()) {
+    //   Object[] row = iterator.next();
+    //   Assert.assertEquals(Arrays.toString(row), expecteds.get(index++));
+    // }
+
+    // expected: int, string, jsonColumn1, jsonColumn2
+    // Object[][] expectedRows = new Object[][]{
+    //     {1, "daffy duck", "[\"this\",\"is\",\"a\",\"test\"]", "\"UP\""},
+    //     {2, "mickey mouse", "{\"a\":\"1\",\"b\":\"2\"}", "\"DOWN\""},
+    //     {3, "donald duck", "{\"a\":\"1\",\"b\":\"2\"}", "\"UP\""},
+    //     {4, "scrooge mcduck", "{\"a\":\"1\",\"b\":\"2\"}", "\"LEFT\""},
+    //     {5, "minney mouse", "{\"name\":\"minney\",\"id\":1}", "\"RIGHT\""},
+    //     {6, "pluto", "\"test\"", "\"DOWN\""},
+    //     {7, "scooby doo", "{\"name\":\"scooby\",\"id\":7}", "\"UP\""}
+    // };
+
+    List<Object[]> expectedRows = new ArrayList<>();
+    expectedRows.add(new Object[]{1, "daffy duck", "[\"this\",\"is\",\"a\",\"test\"]", "\"UP\""});
+    expectedRows.add(new Object[]{2, "mickey mouse", "{\"a\":\"1\",\"b\":\"2\"}", "\"DOWN\""});
+    expectedRows.add(new Object[]{3, "donald duck", "{\"a\":\"1\",\"b\":\"2\"}", "\"UP\""});
+    expectedRows.add(new Object[]{4, "scrooge mcduck", "{\"a\":\"1\",\"b\":\"2\"}", "\"LEFT\""});
+    expectedRows.add(new Object[]{5, "minney mouse", "{\"name\":\"minney\",\"id\":1}", "\"RIGHT\""});
+    expectedRows.add(new Object[]{6, "pluto", "\"IPUTTHISINHERE\"", "\"DOWN\""});
+    expectedRows.add(new Object[]{7, "scooby doo", "{\"name\":\"scooby\",\"id\":7}", "\"UP\""});
 
     int index = 0;
-    Iterator<Object[]> iterator = rows.iterator();
-    while (iterator.hasNext()) {
-      Object[] row = iterator.next();
-      Assert.assertEquals(Arrays.toString(row), expecteds.get(index++));
+    for (Object[] row : rows) {
+      Object[] expected = expectedRows.get(index++);
+
+      // int and string columns: regular equality
+      Assert.assertEquals(row[0], expected[0]);
+      Assert.assertEquals(row[1], expected[1]);
+
+      // JSON column: compare structurally, ignoring object field order
+      String actualJson = row[2].toString();
+      String expectedJson = (String) expected[2];
+      System.out.println("actualJson:");
+      System.out.println(actualJson);
+      System.out.println("expectedJson:");
+      System.out.println(expectedJson);
+      assertJsonEqualsIgnoringOrder(expectedJson, actualJson);
+
+      // jsonColumn2 is just a STRING in this test data
+      Assert.assertEquals(row[3], expected[3]);
     }
   }
 

@@ -19,8 +19,8 @@
 package org.apache.pinot.query.planner.logical;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Sets;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -615,7 +615,7 @@ public final class RelToPlanNodeConverter {
 
   public static Set<String> getTableNamesFromRelRoot(RelNode relRoot) {
     List<RelOptTable> tables = RelOptUtil.findAllTables(relRoot);
-    Set<String> tableNames = Sets.newHashSetWithExpectedSize(tables.size());
+    Set<String> tableNames = new LinkedHashSet<>(tables.size());
     for (RelOptTable table : tables) {
       tableNames.add(getTableNameFromRelTable(table));
     }

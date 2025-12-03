@@ -25,7 +25,8 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -55,8 +56,8 @@ public class DispatchablePlanContext {
   private final Set<String> _nonLookupTables;
   private final Set<QueryServerInstance> _leafServerInstances;
 
-  private final Map<Integer, DispatchablePlanMetadata> _dispatchablePlanMetadataMap = new HashMap<>();
-  private final Map<Integer, PlanNode> _dispatchablePlanStageRootMap = new HashMap<>();
+  private final Map<Integer, DispatchablePlanMetadata> _dispatchablePlanMetadataMap = new LinkedHashMap<>();
+  private final Map<Integer, PlanNode> _dispatchablePlanStageRootMap = new LinkedHashMap<>();
 
 
   public DispatchablePlanContext(WorkerManager workerManager, long requestId, PlannerContext plannerContext,
@@ -70,7 +71,7 @@ public class DispatchablePlanContext {
     if (QueryOptionsUtils.isUseLeafServerForIntermediateStage(plannerContext.getOptions(),
         plannerContext.getEnvConfig().defaultUseLeafServerForIntermediateStage())) {
       // Use only leaf servers for intermediate stages
-      _leafServerInstances = new HashSet<>();
+      _leafServerInstances = new LinkedHashSet<>();
       _nonLookupTables = null;
     } else {
       // Use all servers (excluding lookup tables) for intermediate stages
@@ -144,9 +145,15 @@ public class DispatchablePlanContext {
           dispatchablePlanMetadata.getWorkerIdToMailboxesMap();
       Preconditions.checkArgument(workerIdToSegmentsMap == null || workerIdToTableNameSegmentsMap == null,
           "Both workerIdToSegmentsMap and workerIdToTableNameSegmentsMap cannot be set at the same time");
-      Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdsMap = new HashMap<>();
+      Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdsMap = new LinkedHashMap<>();
       WorkerMetadata[] workerMetadataArray = new WorkerMetadata[workerIdToServerInstanceMap.size()];
-      for (Map.Entry<Integer, QueryServerInstance> serverEntry : workerIdToServerInstanceMap.entrySet()) {
+
+      // Sort entries by worker ID to ensure deterministic iteration
+      List<Map.Entry<Integer, QueryServerInstance>> sortedEntries = 
+          new ArrayList<>(workerIdToServerInstanceMap.entrySet());
+      sortedEntries.sort(Map.Entry.comparingByKey());
+
+      for (Map.Entry<Integer, QueryServerInstance> serverEntry : sortedEntries) {
         int workerId = serverEntry.getKey();
         QueryServerInstance queryServerInstance = serverEntry.getValue();
         serverInstanceToWorkerIdsMap.computeIfAbsent(queryServerInstance, k -> new ArrayList<>()).add(workerId);

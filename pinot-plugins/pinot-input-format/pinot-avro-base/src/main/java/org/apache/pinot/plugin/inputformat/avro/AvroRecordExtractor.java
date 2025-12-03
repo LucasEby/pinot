@@ -57,33 +57,48 @@ public class AvroRecordExtractor extends BaseRecordExtractor<GenericRecord> {
 
   @Override
   public GenericRow extract(GenericRecord from, GenericRow to) {
-    if (_extractAll) {
-      List<Schema.Field> fields = from.getSchema().getFields();
-      for (Schema.Field field : fields) {
-        String fieldName = field.name();
-        Object value = from.get(fieldName);
-        if (_applyLogicalTypes) {
-          value = AvroSchemaUtil.applyLogicalType(field, value);
-        }
-        if (value != null) {
-          value = transformValue(value, field);
-        }
-        to.putValue(fieldName, value);
+      System.out.println("EXTRACT CALLED");
+      if (_extractAll) {
+          List<Schema.Field> fields = from.getSchema().getFields();
+          for (Schema.Field field : fields) {
+              String fieldName = field.name();
+              Object value = from.get(fieldName);
+              if (_applyLogicalTypes) {
+                  value = AvroSchemaUtil.applyLogicalType(field, value);
+              }
+              if (value != null) {
+                  value = transformValue(value, field);
+              }
+              to.putValue(fieldName, value);
+              
+              if ("jsonColumn1".equals(fieldName)) {
+                  System.err.println("AFTER EXTRACTION - Field: " + fieldName + 
+                      ", Value: " + value + 
+                      ", Value Class: " + (value != null ? value.getClass().getName() : "null") +
+                      ", Value Identity: " + System.identityHashCode(value));
+              }
+          }
+      } else {
+          for (String fieldName : _fields) {
+              Schema.Field field = from.getSchema().getField(fieldName);
+              Object value = field == null ? null : from.get(field.pos());
+              if (_applyLogicalTypes) {
+                  value = AvroSchemaUtil.applyLogicalType(field, value);
+              }
+              if (value != null) {
+                  value = transformValue(value, field);
+              }
+              to.putValue(fieldName, value);
+              
+              if ("jsonColumn1".equals(fieldName)) {
+                  System.err.println("AFTER EXTRACTION - Field: " + fieldName + 
+                      ", Value: " + value + 
+                      ", Value Class: " + (value != null ? value.getClass().getName() : "null") +
+                      ", Value Identity: " + System.identityHashCode(value));
+              }
+          }
       }
-    } else {
-      for (String fieldName : _fields) {
-        Schema.Field field = from.getSchema().getField(fieldName);
-        Object value = field == null ? null : from.get(field.pos());
-        if (_applyLogicalTypes) {
-          value = AvroSchemaUtil.applyLogicalType(field, value);
-        }
-        if (value != null) {
-          value = transformValue(value, field);
-        }
-        to.putValue(fieldName, value);
-      }
-    }
-    return to;
+      return to;
   }
 
   protected Object transformValue(Object value, Schema.Field field) {
@@ -108,7 +123,7 @@ public class AvroRecordExtractor extends BaseRecordExtractor<GenericRecord> {
   protected Map<Object, Object> convertRecord(Object value) {
     GenericRecord record = (GenericRecord) value;
     List<Schema.Field> fields = record.getSchema().getFields();
-    Map<Object, Object> convertedMap = Maps.newHashMapWithExpectedSize(fields.size());
+    Map<Object, Object> convertedMap = Maps.newLinkedHashMapWithExpectedSize(fields.size());
     for (Schema.Field field : fields) {
       String fieldName = field.name();
       Object fieldValue = record.get(fieldName);

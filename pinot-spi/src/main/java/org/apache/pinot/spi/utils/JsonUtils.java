@@ -742,6 +742,9 @@ public class JsonUtils {
       return JsonUtils.flatten(jsonNode, jsonIndexConfig);
     } catch (Exception e) {
       if (jsonIndexConfig.getSkipInvalidJson()) {
+        for (int i = 0; i < 6; i ++) {
+          System.out.println("FLATTENED RECORD WAS SKIPPED");
+        }
         return SKIPPED_FLATTENED_RECORD;
       } else {
         throw e;
@@ -811,7 +814,7 @@ class JsonSchemaTreeNode {
 
   public JsonSchemaTreeNode(String key) {
     _key = key;
-    _children = new HashMap<>();
+    _children = new LinkedHashMap<>();
   }
 
   /**

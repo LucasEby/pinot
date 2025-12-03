@@ -20,6 +20,7 @@ package org.apache.pinot.plugin.inputformat.avro;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.avro.file.DataFileStream;
@@ -65,6 +66,15 @@ public class AvroRecordReader implements RecordReader {
   public GenericRow next(GenericRow reuse)
       throws IOException {
     _reusableAvroRecord = _avroReader.next(_reusableAvroRecord);
+
+    System.out.println("Names of all active threads:");
+        Map<Thread, StackTraceElement[]> allThreads = Thread.getAllStackTraces();
+        for (Thread thread : allThreads.keySet()) {
+            System.out.println(thread.getName());
+        }
+
+    System.out.println("AVRO RECORD BEFORE EXTRACTION: " + _reusableAvroRecord);
+
     _recordExtractor.extract(_reusableAvroRecord, reuse);
     return reuse;
   }

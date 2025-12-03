@@ -21,8 +21,8 @@ package org.apache.pinot.query.planner.physical;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -75,11 +75,11 @@ public class DispatchablePlanMetadata implements Serializable {
   private Map<String, List<String>> _replicatedSegments;
   private TimeBoundaryInfo _timeBoundaryInfo;
   private int _partitionParallelism = 1;
-  private final Map<String, Set<String>> _tableToUnavailableSegmentsMap = new HashMap<>();
+  private final Map<String, Set<String>> _tableToUnavailableSegmentsMap = new LinkedHashMap<>();
 
   // Calculated in {@link MailboxAssignmentVisitor}
   // Map from workerId -> {planFragmentId -> mailboxes}
-  private final Map<Integer, Map<Integer, MailboxInfos>> _workerIdToMailboxesMap = new HashMap<>();
+  private final Map<Integer, Map<Integer, MailboxInfos>> _workerIdToMailboxesMap = new LinkedHashMap<>();
 
   /**
    * Map from workerId -> {physicalTableName -> segments} is required for logical tables.
@@ -183,7 +183,7 @@ public class DispatchablePlanMetadata implements Serializable {
   }
 
   public void addUnavailableSegments(String tableName, Collection<String> unavailableSegments) {
-    _tableToUnavailableSegmentsMap.computeIfAbsent(tableName, k -> new HashSet<>()).addAll(unavailableSegments);
+    _tableToUnavailableSegmentsMap.computeIfAbsent(tableName, k -> new LinkedHashSet<>()).addAll(unavailableSegments);
   }
 
   @Nullable

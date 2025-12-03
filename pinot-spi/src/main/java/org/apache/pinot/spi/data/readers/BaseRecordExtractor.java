@@ -146,7 +146,7 @@ public abstract class BaseRecordExtractor<T> implements RecordExtractor<T> {
    */
   protected Map<Object, Object> convertMap(Object value) {
     Map<Object, Object> map = (Map) value;
-    Map<Object, Object> convertedMap = Maps.newHashMapWithExpectedSize(map.size());
+    Map<Object, Object> convertedMap = Maps.newLinkedHashMapWithExpectedSize(map.size());
     for (Map.Entry<Object, Object> entry : map.entrySet()) {
       Object mapKey = entry.getKey();
       if (mapKey != null) {
