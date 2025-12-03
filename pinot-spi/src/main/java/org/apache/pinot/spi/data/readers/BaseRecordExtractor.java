@@ -104,9 +104,19 @@ public abstract class BaseRecordExtractor<T> implements RecordExtractor<T> {
     int numValues = collection.size();
     Object[] convertedValues = new Object[numValues];
     int index = 0;
+    System.out.println("CONVERT COLLECTION CALLED HERE");
     for (Object value : collection) {
       Object convertedValue = value != null ? convert(value) : null;
       convertedValues[index++] = convertedValue;
+      // This didn't find anything:
+      // System.out.println("Converted value: " + convertedValue);
+      // if (convertedValue instanceof LinkedHashMap<?, ?>) {
+      //     LinkedHashMap<?, ?> map = (LinkedHashMap<?, ?>) convertedValue;
+      //     System.out.println("LinkedHashMap contents:");
+      //     for (Map.Entry<?, ?> entry : map.entrySet()) {
+      //         System.out.println(entry.getKey() + " = " + entry.getValue());
+      //     }
+      // }
     }
     return convertedValues;
   }

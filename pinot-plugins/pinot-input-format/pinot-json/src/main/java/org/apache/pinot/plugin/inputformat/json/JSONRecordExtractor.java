@@ -46,6 +46,7 @@ public class JSONRecordExtractor extends BaseRecordExtractor<Map<String, Object>
 
   @Override
   public GenericRow extract(Map<String, Object> from, GenericRow to) {
+    System.out.println("JSON RECORD EXTRACTOR CALLED");
     if (_extractAll) {
       for (Map.Entry<String, Object> fieldToVal : from.entrySet()) {
         Object value = fieldToVal.getValue();

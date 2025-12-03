@@ -21,7 +21,7 @@ package org.apache.pinot.spi.data.readers;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -33,8 +33,8 @@ public class RecordReaderFactory {
   private RecordReaderFactory() {
   }
 
-  private static final Map<String, String> DEFAULT_RECORD_READER_CLASS_MAP = new HashMap<>();
-  private static final Map<String, String> DEFAULT_RECORD_READER_CONFIG_CLASS_MAP = new HashMap<>();
+  private static final Map<String, String> DEFAULT_RECORD_READER_CLASS_MAP = new LinkedHashMap<>();
+  private static final Map<String, String> DEFAULT_RECORD_READER_CONFIG_CLASS_MAP = new LinkedHashMap<>();
 
   // TODO: This could be removed once we have dynamic loading plugins supports.
   static final String DEFAULT_AVRO_RECORD_READER_CLASS = "org.apache.pinot.plugin.inputformat.avro.AvroRecordReader";

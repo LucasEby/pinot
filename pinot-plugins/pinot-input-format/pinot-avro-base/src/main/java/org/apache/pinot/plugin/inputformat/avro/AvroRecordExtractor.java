@@ -57,7 +57,7 @@ public class AvroRecordExtractor extends BaseRecordExtractor<GenericRecord> {
 
   @Override
   public GenericRow extract(GenericRecord from, GenericRow to) {
-      System.out.println("EXTRACT CALLED");
+      // System.out.println("AvroRecordExtractor EXTRACT CALLED");
       if (_extractAll) {
           List<Schema.Field> fields = from.getSchema().getFields();
           for (Schema.Field field : fields) {

@@ -53,6 +53,7 @@ public class ThriftRecordExtractor extends BaseRecordExtractor<TBase> {
 
   @Override
   public GenericRow extract(TBase from, GenericRow to) {
+    System.out.println("ThriftRecordExtractor EXTRACT CALLED");
     if (_extractAll) {
       for (Map.Entry<String, Integer> nameToId : _fieldIds.entrySet()) {
         Object value = from.getFieldValue(from.fieldForId(nameToId.getValue()));
