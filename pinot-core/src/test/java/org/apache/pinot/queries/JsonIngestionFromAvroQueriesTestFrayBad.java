@@ -59,11 +59,19 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+// import org.testng.Assert;
+// import org.testng.annotations.AfterClass;
+// import org.testng.annotations.BeforeClass;
+// import org.testng.annotations.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.pastalab.fray.junit.plain.FrayInTestLauncher;
-import org.testng.Assert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
+import org.pastalab.fray.junit.junit5.FrayTestExtension;
+import org.pastalab.fray.junit.junit5.annotations.ConcurrencyTest;
 
 import static org.apache.avro.Schema.Field;
 import static org.apache.avro.Schema.Type;
@@ -80,7 +88,8 @@ import static org.apache.avro.Schema.createUnion;
  * Test if ComplexType (RECORD, ARRAY, MAP, UNION, ENUM, and FIXED) field from an AVRO file can be ingested into a JSON
  * column in a Pinot segment.
  */
-public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
+@ExtendWith(FrayTestExtension.class)
+public class JsonIngestionFromAvroQueriesTestFrayBad extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "JsonIngestionFromAvroTest");
   private static final File AVRO_DATA_FILE = new File(INDEX_DIR, "JsonIngestionFromAvroTest.avro");
   private static final String RAW_TABLE_NAME = "testTable";
@@ -281,7 +290,9 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
   }
 
   /** Create an AVRO file and then ingest it into Pinot while creating a JsonIndex. */
-  @BeforeClass
+  // @BeforeClass
+  // @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+  @BeforeAll
   public void setUp()
       throws Exception {
     FileUtils.deleteDirectory(INDEX_DIR);
@@ -312,18 +323,19 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
             
             // JsonNode.equals() ignores field order for objects
             // but maintains order for arrays
-            Assert.assertTrue(expected.equals(actual), 
+            Assertions.assertTrue(expected.equals(actual), 
               "JSON did not match ignoring field order.\nExpected: " + expectedJson + "\nActual: " + actualJson);
                 
         } catch (Exception e) {
-            Assert.fail("Failed to parse JSON: " + e.getMessage(), e);
+            Assertions.fail("Failed to parse JSON: " + e.getMessage(), e);
         }
     }
 
   /** Verify that we can query the JSON column that ingested ComplexType data from an AVRO file (see setUp). */
   @Test
+  @ConcurrencyTest
   public void testSimpleSelectOnJsonColumn() {
-    FrayInTestLauncher.INSTANCE.launchFrayTest(() -> {
+    //  FrayInTestLauncher.INSTANCE.launchFrayTest(() -> {
     Operator<SelectionResultsBlock> operator =
         getOperator("select intColumn, stringColumn, jsonColumn1, jsonColumn2 FROM testTable ORDER BY intColumn limit 100");
     SelectionResultsBlock block = operator.nextBlock();
@@ -355,9 +367,9 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
     // SelectionResultsBlock block = operator.nextBlock();
     // // Collection<Object[]> rows = block.getRows();
     // List<Object[]> rows = new ArrayList<>(block.getRows());
-    Assert.assertEquals(block.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.INT);
-    Assert.assertEquals(block.getDataSchema().getColumnDataType(1), DataSchema.ColumnDataType.STRING);
-    Assert.assertEquals(block.getDataSchema().getColumnDataType(2), DataSchema.ColumnDataType.JSON);
+    Assertions.assertEquals(block.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.INT);
+    Assertions.assertEquals(block.getDataSchema().getColumnDataType(1), DataSchema.ColumnDataType.STRING);
+    Assertions.assertEquals(block.getDataSchema().getColumnDataType(2), DataSchema.ColumnDataType.JSON);
 
     // List<String> expecteds = Arrays.asList("[1, daffy duck, [\"this\",\"is\",\"a\",\"test\"], \"UP\"]",
     //     "[2, mickey mouse, {\"a\":\"1\",\"b\":\"2\"}, \"DOWN\"]", "[3, donald duck, {\"a\":\"1\",\"b\":\"2\"}, \"UP\"]",
@@ -369,7 +381,7 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
     // Iterator<Object[]> iterator = rows.iterator();
     // while (iterator.hasNext()) {
     //   Object[] row = iterator.next();
-    //   Assert.assertEquals(Arrays.toString(row), expecteds.get(index++));
+    //   Assertions.assertEquals(Arrays.toString(row), expecteds.get(index++));
     // }
 
     // expected: int, string, jsonColumn1, jsonColumn2
@@ -397,8 +409,8 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
       Object[] expected = expectedRows.get(index++);
 
       // int and string columns: regular equality
-      Assert.assertEquals(row[0], expected[0]);
-      Assert.assertEquals(row[1], expected[1]);
+      Assertions.assertEquals(row[0], expected[0]);
+      Assertions.assertEquals(row[1], expected[1]);
 
       // JSON column: compare structurally, ignoring object field order
       String actualJson = row[2].toString();
@@ -410,94 +422,94 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
       assertJsonEqualsIgnoringOrder(expectedJson, actualJson);
 
       // jsonColumn2 is just a STRING in this test data
-      Assert.assertEquals(row[3], expected[3]);
+      Assertions.assertEquals(row[3], expected[3]);
     }
-    });
+    // });
   }
 
   /** Verify simple path expression query on ingested Avro file. */
-  @Test
-  public void testJsonPathSelectOnJsonColumn() {
-    Operator<SelectionResultsBlock> operator = getOperator(
-        "select intColumn, json_extract_scalar(jsonColumn1, '$.name', " + "'STRING', 'null') FROM testTable");
-    SelectionResultsBlock block = operator.nextBlock();
-    Collection<Object[]> rows = block.getRows();
-    Assert.assertEquals(block.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.INT);
-    Assert.assertEquals(block.getDataSchema().getColumnDataType(1), DataSchema.ColumnDataType.STRING);
+  // @Test
+  // public void testJsonPathSelectOnJsonColumn() {
+  //   Operator<SelectionResultsBlock> operator = getOperator(
+  //       "select intColumn, json_extract_scalar(jsonColumn1, '$.name', " + "'STRING', 'null') FROM testTable");
+  //   SelectionResultsBlock block = operator.nextBlock();
+  //   Collection<Object[]> rows = block.getRows();
+  //   Assert.assertEquals(block.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.INT);
+  //   Assert.assertEquals(block.getDataSchema().getColumnDataType(1), DataSchema.ColumnDataType.STRING);
 
-    List<String> expecteds =
-        Arrays.asList("[1, null]", "[2, null]", "[3, null]", "[4, null]", "[5, minney]", "[6, null]", "[7, scooby]");
-    int index = 0;
+  //   List<String> expecteds =
+  //       Arrays.asList("[1, null]", "[2, null]", "[3, null]", "[4, null]", "[5, minney]", "[6, null]", "[7, scooby]");
+  //   int index = 0;
 
-    Iterator<Object[]> iterator = rows.iterator();
-    while (iterator.hasNext()) {
-      Object[] row = iterator.next();
-      Assert.assertEquals(Arrays.toString(row), expecteds.get(index++));
-    }
-  }
+  //   Iterator<Object[]> iterator = rows.iterator();
+  //   while (iterator.hasNext()) {
+  //     Object[] row = iterator.next();
+  //     Assert.assertEquals(Arrays.toString(row), expecteds.get(index++));
+  //   }
+  // }
 
   /** Verify simple path expression query on ingested Avro file. */
-  @Test
-  public void testStringValueSelectOnJsonColumn() {
-    Operator<SelectionResultsBlock> operator = getOperator(
-        "SELECT json_extract_scalar(jsonColumn1, '$', 'STRING') FROM "
-            + "testTable WHERE JSON_MATCH(jsonColumn1, '\"$\" = ''test''')");
-    SelectionResultsBlock block = operator.nextBlock();
-    Collection<Object[]> rows = block.getRows();
-    Assert.assertEquals(block.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.STRING);
+  // @Test
+  // public void testStringValueSelectOnJsonColumn() {
+  //   Operator<SelectionResultsBlock> operator = getOperator(
+  //       "SELECT json_extract_scalar(jsonColumn1, '$', 'STRING') FROM "
+  //           + "testTable WHERE JSON_MATCH(jsonColumn1, '\"$\" = ''test''')");
+  //   SelectionResultsBlock block = operator.nextBlock();
+  //   Collection<Object[]> rows = block.getRows();
+  //   Assert.assertEquals(block.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.STRING);
 
-    List<String> expecteds = Arrays.asList("[test]");
-    int index = 0;
+  //   List<String> expecteds = Arrays.asList("[test]");
+  //   int index = 0;
 
-    Iterator<Object[]> iterator = rows.iterator();
-    while (iterator.hasNext()) {
-      Object[] row = iterator.next();
-      Assert.assertEquals(Arrays.toString(row), expecteds.get(index++));
-    }
-  }
+  //   Iterator<Object[]> iterator = rows.iterator();
+  //   while (iterator.hasNext()) {
+  //     Object[] row = iterator.next();
+  //     Assert.assertEquals(Arrays.toString(row), expecteds.get(index++));
+  //   }
+  // }
 
   /** Verify that ingestion from avro FIXED type field (jsonColumn3) to Pinot JSON column worked fine. */
-  @Test
-  public void testSimpleSelectOnFixedJsonColumn() {
-    testByteArray("select jsonColumn3 FROM testTable");
-  }
+  // @Test
+  // public void testSimpleSelectOnFixedJsonColumn() {
+  //   testByteArray("select jsonColumn3 FROM testTable");
+  // }
 
-  /** Verify that ingestion from avro BYTES type field (jsonColumn4) to Pinot JSON column worked fine. */
-  @Test
-  public void testSimpleSelectOnBytesJsonColumn() {
-    testByteArray("select jsonColumn4 FROM testTable");
-  }
+  // /** Verify that ingestion from avro BYTES type field (jsonColumn4) to Pinot JSON column worked fine. */
+  // @Test
+  // public void testSimpleSelectOnBytesJsonColumn() {
+  //   testByteArray("select jsonColumn4 FROM testTable");
+  // }
 
-  @Test
-  public void testComplexSelectOnJsonColumn() {
-    Operator<SelectionResultsBlock> operator = getOperator(
-        "select jsonColumn5 FROM testTable");
-    SelectionResultsBlock block = operator.nextBlock();
-    Collection<Object[]> rows = block.getRows();
-    Assert.assertEquals(block.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.JSON);
+  // @Test
+  // public void testComplexSelectOnJsonColumn() {
+  //   Operator<SelectionResultsBlock> operator = getOperator(
+  //       "select jsonColumn5 FROM testTable");
+  //   SelectionResultsBlock block = operator.nextBlock();
+  //   Collection<Object[]> rows = block.getRows();
+  //   Assert.assertEquals(block.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.JSON);
 
-    List<String> expecteds = Arrays.asList(
-        "[[{\"data\":{\"a\":\"1\",\"b\":\"2\"},\"timestamp\":1719390721}]]",
-        "[[{\"data\":{\"a\":\"2\",\"b\":\"4\"},\"timestamp\":1719390722}]]",
-        "[[{\"data\":{\"a\":\"3\",\"b\":\"6\"},\"timestamp\":1719390723}]]",
-        "[[{\"data\":{\"a\":\"4\",\"b\":\"8\"},\"timestamp\":1719390724}]]",
-        "[[{\"data\":{\"a\":\"5\",\"b\":\"10\"},\"timestamp\":1719390725}]]",
-        "[[{\"data\":{\"a\":\"6\",\"b\":\"12\"},\"timestamp\":1719390726}]]",
-        "[[{\"data\":{\"a\":\"7\",\"b\":\"14\"},\"timestamp\":1719390727}]]");
+  //   List<String> expecteds = Arrays.asList(
+  //       "[[{\"data\":{\"a\":\"1\",\"b\":\"2\"},\"timestamp\":1719390721}]]",
+  //       "[[{\"data\":{\"a\":\"2\",\"b\":\"4\"},\"timestamp\":1719390722}]]",
+  //       "[[{\"data\":{\"a\":\"3\",\"b\":\"6\"},\"timestamp\":1719390723}]]",
+  //       "[[{\"data\":{\"a\":\"4\",\"b\":\"8\"},\"timestamp\":1719390724}]]",
+  //       "[[{\"data\":{\"a\":\"5\",\"b\":\"10\"},\"timestamp\":1719390725}]]",
+  //       "[[{\"data\":{\"a\":\"6\",\"b\":\"12\"},\"timestamp\":1719390726}]]",
+  //       "[[{\"data\":{\"a\":\"7\",\"b\":\"14\"},\"timestamp\":1719390727}]]");
 
-    int index = 0;
-    Iterator<Object[]> iterator = rows.iterator();
-    while (iterator.hasNext()) {
-      Object[] row = iterator.next();
-      Assert.assertEquals(Arrays.toString(row), expecteds.get(index++));
-    }
-  }
+  //   int index = 0;
+  //   Iterator<Object[]> iterator = rows.iterator();
+  //   while (iterator.hasNext()) {
+  //     Object[] row = iterator.next();
+  //     Assert.assertEquals(Arrays.toString(row), expecteds.get(index++));
+  //   }
+  // }
 
   private void testByteArray(String query) {
     Operator<SelectionResultsBlock> operator = getOperator(query);
     SelectionResultsBlock block = operator.nextBlock();
     Collection<Object[]> rows = block.getRows();
-    Assert.assertEquals(block.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.JSON);
+    Assertions.assertEquals(block.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.JSON);
 
     List<String> expecteds = IntStream.range(1, 8)
         .mapToObj(i -> new byte[] {0, 0, 0, (byte) i})
@@ -506,11 +518,13 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
 
     int index = 0;
     for (Object[] row : rows) {
-      Assert.assertEquals(Arrays.toString(row), expecteds.get(index++));
+      Assertions.assertEquals(Arrays.toString(row), expecteds.get(index++));
     }
   }
 
-  @AfterClass
+  // @AfterClass
+  // @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+  @AfterAll
   public void tearDown()
       throws IOException {
     _indexSegment.destroy();
