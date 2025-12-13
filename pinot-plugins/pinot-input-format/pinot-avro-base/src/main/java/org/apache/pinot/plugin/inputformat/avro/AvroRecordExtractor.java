@@ -89,6 +89,7 @@ public class AvroRecordExtractor extends BaseRecordExtractor<GenericRecord> {
                   value = transformValue(value, field);
               }
               to.putValue(fieldName, value);
+              System.out.println("AVRO RECORD EXTRACTOR ELSE");
               
               if ("jsonColumn1".equals(fieldName)) {
                   System.err.println("AFTER EXTRACTION - Field: " + fieldName + 
@@ -98,6 +99,7 @@ public class AvroRecordExtractor extends BaseRecordExtractor<GenericRecord> {
               }
           }
       }
+      System.out.println("END OF AVRO RECORD EXTRACTOR");
       return to;
   }
 

@@ -594,6 +594,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       throws Exception {
     long statsCollectorStartTime = System.nanoTime();
 
+    System.out.println("SegmentIndexCreationDriverImpl START: collectStatsAndIndexCreationInfo");
     // Initialize stats collection
     _segmentStats = _dataSource.gatherStats(
         new StatsCollectorConfig(_config.getTableConfig(), _dataSchema, _config.getSegmentPartitionConfig()));
@@ -602,6 +603,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
     for (FieldSpec fieldSpec : _dataSchema.getAllFieldSpecs()) {
       // Ignore virtual columns
+      System.out.println("Field spec: " + fieldSpec);
       if (fieldSpec.isVirtualColumn()) {
         continue;
       }
@@ -623,6 +625,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     }
     _segmentIndexCreationInfo.setTotalDocs(_totalDocs);
     _totalStatsCollectorTimeNs = System.nanoTime() - statsCollectorStartTime;
+      System.out.println("SegmentIndexCreationDriverImpl END: collectStatsAndIndexCreaationInfo");
   }
 
   /**

@@ -104,7 +104,7 @@ public abstract class BaseRecordExtractor<T> implements RecordExtractor<T> {
     int numValues = collection.size();
     Object[] convertedValues = new Object[numValues];
     int index = 0;
-    System.out.println("CONVERT COLLECTION CALLED HERE");
+    // System.out.println("CONVERT COLLECTION CALLED HERE");
     for (Object value : collection) {
       Object convertedValue = value != null ? convert(value) : null;
       convertedValues[index++] = convertedValue;

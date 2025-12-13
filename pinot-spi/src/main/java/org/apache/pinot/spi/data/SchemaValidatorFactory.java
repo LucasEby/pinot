@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.spi.data;
 
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import org.apache.pinot.spi.plugin.PluginManager;
 
@@ -27,7 +27,7 @@ public class SchemaValidatorFactory {
   private SchemaValidatorFactory() {
   }
 
-  private static final Map<String, String> DEFAULT_RECORD_READER_TO_SCHEMA_VALIDATOR_MAP = new HashMap<>();
+  private static final Map<String, String> DEFAULT_RECORD_READER_TO_SCHEMA_VALIDATOR_MAP = new LinkedHashMap<>();
 
   private static final String DEFAULT_AVRO_RECORD_READER_CLASS =
       "org.apache.pinot.plugin.inputformat.avro.AvroRecordReader";

@@ -64,7 +64,7 @@ public class AvroRecordReader implements RecordReader {
   @Override
   public GenericRow next(GenericRow reuse)
       throws IOException {
-    System.out.println("===========");
+    // System.out.println("===========");
     // System.out.println("AVRO RECORD BEFORE NEXT: " + _reusableAvroRecord);
     _reusableAvroRecord = _avroReader.next(_reusableAvroRecord);
 
@@ -74,11 +74,11 @@ public class AvroRecordReader implements RecordReader {
     //         System.out.println(thread.getName());
     //     }
 
-    System.out.println("AVRO RECORD BEFORE EXTRACTION: " + _reusableAvroRecord);
+    // System.out.println("AVRO RECORD BEFORE EXTRACTION: " + _reusableAvroRecord);
     _recordExtractor.extract(_reusableAvroRecord, reuse);
-    System.out.println("AVRO RECORD AFTER EXTRACTION: " + _reusableAvroRecord);
-    System.out.println("REUSE: " + reuse);
-    System.out.println("===========");
+    // System.out.println("AVRO RECORD AFTER EXTRACTION: " + _reusableAvroRecord);
+    // System.out.println("REUSE: " + reuse);
+    // System.out.println("===========");
     return reuse;
   }
 

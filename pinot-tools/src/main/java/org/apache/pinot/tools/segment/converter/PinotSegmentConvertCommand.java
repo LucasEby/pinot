@@ -19,7 +19,7 @@
 package org.apache.pinot.tools.segment.converter;
 
 import java.io.File;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
@@ -94,7 +94,7 @@ public class PinotSegmentConvertCommand extends AbstractBaseCommand implements C
     File tempDir = new File(outputDir, TEMP_DIR_NAME);
     try {
       // Add all segments to the segment path map.
-      Map<String, String> segmentPath = new HashMap<>();
+      Map<String, String> segmentPath = new LinkedHashMap<>();
       File dataDir = new File(_dataDir);
       File[] files = dataDir.listFiles();
       if (files == null || files.length == 0) {
