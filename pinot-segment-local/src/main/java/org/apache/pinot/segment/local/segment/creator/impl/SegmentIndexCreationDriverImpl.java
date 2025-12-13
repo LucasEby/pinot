@@ -289,8 +289,16 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
         TransformPipeline.Result result;
         try {
           long recordReadStartTimeNs = System.nanoTime();
+          // GenericRow decodedRow = _recordReader.next(reuse);
+          // result = _transformPipeline.processRow(decodedRow);
+
           GenericRow decodedRow = _recordReader.next(reuse);
-          result = _transformPipeline.processRow(decodedRow);
+
+          // DEFENSIVE COPY: Create a safe copy to prevent row reuse corruption
+          GenericRow safeCopy = decodedRow.copy();
+
+          result = _transformPipeline.processRow(safeCopy);
+
           recordReadStopTimeNs = System.nanoTime();
           _totalRecordReadTimeNs += recordReadStopTimeNs - recordReadStartTimeNs;
         } catch (Exception e) {
@@ -603,7 +611,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
     for (FieldSpec fieldSpec : _dataSchema.getAllFieldSpecs()) {
       // Ignore virtual columns
-      System.out.println("Field spec: " + fieldSpec);
+      // System.out.println("Field spec: " + fieldSpec + " isVirtualColumn? " + fieldSpec.isVirtualColumn());
       if (fieldSpec.isVirtualColumn()) {
         continue;
       }

@@ -71,12 +71,12 @@ public class AvroRecordExtractor extends BaseRecordExtractor<GenericRecord> {
               }
               to.putValue(fieldName, value);
               
-              if ("jsonColumn1".equals(fieldName)) {
-                  System.err.println("AFTER EXTRACTION - Field: " + fieldName + 
-                      ", Value: " + value + 
-                      ", Value Class: " + (value != null ? value.getClass().getName() : "null") +
-                      ", Value Identity: " + System.identityHashCode(value));
-              }
+              // if ("jsonColumn1".equals(fieldName)) {
+              //     System.err.println("AFTER EXTRACTION in IF - Field: " + fieldName + 
+              //         ", Value: " + value + 
+              //         ", Value Class: " + (value != null ? value.getClass().getName() : "null") +
+              //         ", Value Identity: " + System.identityHashCode(value));
+              // }
           }
       } else {
           for (String fieldName : _fields) {
@@ -89,22 +89,23 @@ public class AvroRecordExtractor extends BaseRecordExtractor<GenericRecord> {
                   value = transformValue(value, field);
               }
               to.putValue(fieldName, value);
-              System.out.println("AVRO RECORD EXTRACTOR ELSE");
+              // System.out.println("AVRO RECORD EXTRACTOR ELSE");
               
-              if ("jsonColumn1".equals(fieldName)) {
-                  System.err.println("AFTER EXTRACTION - Field: " + fieldName + 
-                      ", Value: " + value + 
-                      ", Value Class: " + (value != null ? value.getClass().getName() : "null") +
-                      ", Value Identity: " + System.identityHashCode(value));
-              }
+              // if ("jsonColumn1".equals(fieldName)) {
+              //     System.err.println("AFTER EXTRACTION in ELSE - Field: " + fieldName + 
+              //         ", Value: " + value + 
+              //         ", Value Class: " + (value != null ? value.getClass().getName() : "null") +
+              //         ", Value Identity: " + System.identityHashCode(value));
+              // }
           }
       }
-      System.out.println("END OF AVRO RECORD EXTRACTOR");
+      // System.out.println("END OF AVRO RECORD EXTRACTOR");
       return to;
   }
 
   protected Object transformValue(Object value, Schema.Field field) {
-    return convert(value);
+      // System.out.println("value object is GenericData Array contains values object which has a HashMap at 1");
+      return convert(value);
   }
 
   /**
@@ -131,6 +132,12 @@ public class AvroRecordExtractor extends BaseRecordExtractor<GenericRecord> {
       Object fieldValue = record.get(fieldName);
       Object convertedValue = fieldValue != null ? transformValue(fieldValue, field) : null;
       convertedMap.put(fieldName, convertedValue);
+      if ("jsonColumn1".equals(fieldName)) {
+          System.err.println("convertRecord - Field: " + fieldName + 
+              ", Value: " + convertedValue + 
+              ", Value Class: " + (convertedValue != null ? convertedValue.getClass().getName() : "null") +
+              ", Value Identity: " + System.identityHashCode(convertedValue));
+      }
     }
     return convertedMap;
   }

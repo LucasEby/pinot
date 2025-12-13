@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.creator;
 
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -54,7 +54,7 @@ public class TransformPipeline {
     _tableNameWithType = tableNameWithType;
     _transformers = transformers;
     FilterTransformer filterTransformer = null;
-    Set<String> cumulativeInputColumns = new HashSet<>();
+    Set<String> cumulativeInputColumns = new LinkedHashSet<>();
     for (int i = transformers.size() - 1; i >= 0; i--) {
       RecordTransformer recordTransformer = transformers.get(i);
       if (recordTransformer instanceof FilterTransformer) {
