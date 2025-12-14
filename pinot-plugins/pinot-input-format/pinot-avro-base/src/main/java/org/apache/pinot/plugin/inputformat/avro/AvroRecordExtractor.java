@@ -131,7 +131,8 @@ public class AvroRecordExtractor extends BaseRecordExtractor<GenericRecord> {
       String fieldName = field.name();
       Object fieldValue = record.get(fieldName);
       Object convertedValue = fieldValue != null ? transformValue(fieldValue, field) : null;
-      convertedMap.put(fieldName, convertedValue);
+      // convertedMap.put(fieldName, convertedValue);
+      convertedMap.put(new String(fieldName), convertedValue);
       if ("jsonColumn1".equals(fieldName)) {
           System.err.println("convertRecord - Field: " + fieldName + 
               ", Value: " + convertedValue + 

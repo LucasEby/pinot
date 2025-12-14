@@ -165,6 +165,10 @@ public abstract class BaseRecordExtractor<T> implements RecordExtractor<T> {
         convertedMap.put(convertSingleValue(entry.getKey()), convertedMapValue);
       }
     }
+    String result = convertedMap.toString();  // Or however it converts
+    System.out.println("Map.toString() called: " + result +
+            " (result identity: " + System.identityHashCode(result) +
+            ", map identity: " + System.identityHashCode(convertedMap) + ")");
     return convertedMap;
   }
 

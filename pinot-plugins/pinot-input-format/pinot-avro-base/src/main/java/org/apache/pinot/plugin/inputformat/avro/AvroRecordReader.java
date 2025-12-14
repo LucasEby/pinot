@@ -41,19 +41,41 @@ public class AvroRecordReader implements RecordReader {
   public AvroRecordReader() {
   }
 
+  // @Override
+  // public void init(File dataFile, Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
+  //     throws IOException {
+  //   AvroRecordReaderConfig config = recordReaderConfig == null
+  //       ? new AvroRecordReaderConfig()
+  //       : (AvroRecordReaderConfig) recordReaderConfig;
+  //   _dataFile = dataFile;
+  //   _avroReader = AvroUtils.getAvroReader(dataFile);
+
+  //   AvroRecordExtractorConfig recordExtractorConfig = new AvroRecordExtractorConfig();
+  //   recordExtractorConfig.setEnableLogicalTypes(config.isEnableLogicalTypes());
+  //   _recordExtractor = new AvroRecordExtractor();
+  //   _recordExtractor.init(fieldsToRead, recordExtractorConfig);
+  // }
+
   @Override
   public void init(File dataFile, Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
+    System.out.println("=== AVRO INIT CALLED ===");
+    
     AvroRecordReaderConfig config = recordReaderConfig == null
         ? new AvroRecordReaderConfig()
         : (AvroRecordReaderConfig) recordReaderConfig;
     _dataFile = dataFile;
     _avroReader = AvroUtils.getAvroReader(dataFile);
 
+    System.out.println("  _avroReader identity: " + System.identityHashCode(_avroReader));
+    
     AvroRecordExtractorConfig recordExtractorConfig = new AvroRecordExtractorConfig();
     recordExtractorConfig.setEnableLogicalTypes(config.isEnableLogicalTypes());
     _recordExtractor = new AvroRecordExtractor();
     _recordExtractor.init(fieldsToRead, recordExtractorConfig);
+    
+    System.out.println("  _recordExtractor identity: " + System.identityHashCode(_recordExtractor));
+    System.out.println("=== AVRO INIT COMPLETE ===");
   }
 
   @Override
@@ -61,20 +83,45 @@ public class AvroRecordReader implements RecordReader {
     return _avroReader.hasNext();
   }
 
+  // @Override
+  // public GenericRow next(GenericRow reuse)
+  //     throws IOException {
+  //   _reusableAvroRecord = _avroReader.next(_reusableAvroRecord);
+  //   _recordExtractor.extract(_reusableAvroRecord, reuse);
+  //   return reuse;
+  // }
+
   @Override
   public GenericRow next(GenericRow reuse)
       throws IOException {
-    _reusableAvroRecord = _avroReader.next(_reusableAvroRecord);
-    _recordExtractor.extract(_reusableAvroRecord, reuse);
+    // Passing null forces Avro to create a new GenericRecord each time
+    // This prevents object reuse issues down the line
+    GenericRecord avroRecord = _avroReader.next(null);
+    _recordExtractor.extract(avroRecord, reuse);
     return reuse;
   }
+
+  // @Override
+  // public void rewind()
+  //     throws IOException {
+  //   _avroReader.close();
+  //   _avroReader = AvroUtils.getAvroReader(_dataFile);
+  //   _reusableAvroRecord = null;
+  // }
 
   @Override
   public void rewind()
       throws IOException {
+    System.out.println("=== AVRO REWIND CALLED ===");
+    System.out.println("  Closing old _avroReader: " + System.identityHashCode(_avroReader));
     _avroReader.close();
+    
+    System.out.println("  Creating new _avroReader");
     _avroReader = AvroUtils.getAvroReader(_dataFile);
+    System.out.println("  New _avroReader: " + System.identityHashCode(_avroReader));
     _reusableAvroRecord = null;
+    System.out.println("  _recordExtractor identity: " + System.identityHashCode(_recordExtractor));
+    System.out.println("=== AVRO REWIND COMPLETE ===");
   }
 
   @Override

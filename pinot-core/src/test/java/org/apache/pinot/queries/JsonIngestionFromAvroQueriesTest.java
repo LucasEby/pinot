@@ -28,9 +28,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.avro.Schema;
@@ -142,7 +142,7 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
   }
 
   private static Map<String, String> createMapField(Pair<String, String>[] pairs) {
-    Map<String, String> map = new TreeMap<>();
+    Map<String, String> map = new LinkedHashMap<>();
     for (Pair<String, String> pair : pairs) {
       map.put(pair.getLeft(), pair.getRight());
     }

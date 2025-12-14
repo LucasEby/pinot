@@ -315,6 +315,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       _recordReader.rewind();
       LOGGER.info("Start building IndexCreator!");
       GenericRow reuse = new GenericRow();
+      int rowNum = 0;
+      System.out.println("=== STARTING MAIN INDEX BUILD LOOP ===");
+
       while (_recordReader.hasNext()) {
         long recordReadStopTimeNs;
         reuse.clear();
@@ -326,12 +329,16 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
           // result = _transformPipeline.processRow(decodedRow);
 
           GenericRow decodedRow = _recordReader.next(reuse);
-//          System.out.println("BUILD LOOP - decodedRow identity: " + System.identityHashCode(decodedRow) +
-//                  ", reuse identity: " + System.identityHashCode(reuse) +
-//                  ", same object? " + (decodedRow == reuse));
+          Object jsonValue = decodedRow.getValue("jsonColumn1");
+          System.out.println("BUILD row " + rowNum + " - AFTER read, jsonColumn1: " + jsonValue +
+                  " (identity: " + System.identityHashCode(jsonValue) + ")");
 
           // DEFENSIVE COPY: Create a safe copy to prevent row reuse corruption
           GenericRow safeCopy = decodedRow.copy();
+
+          Object copiedJson = safeCopy.getValue("jsonColumn1");
+          System.out.println("BUILD row " + rowNum + " - AFTER copy, jsonColumn1: " + copiedJson +
+                  " (identity: " + System.identityHashCode(copiedJson) + ")");
 
           result = _transformPipeline.processRow(safeCopy);
 
@@ -348,19 +355,21 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
         }
 
         for (GenericRow row : result.getTransformedRows()) {
-//          System.out.println("  Transformed row identity: " + System.identityHashCode(row) +
-//                  ", same as reuse? " + (row == reuse) +
-//                  ", jsonColumn1 identity: " + System.identityHashCode(row.getValue("jsonColumn1")) +
-//                  ", value: " + row.getValue("jsonColumn1"));
+          Object transformedJson = row.getValue("jsonColumn1");
+          System.out.println("BUILD row " + rowNum + " - BEFORE indexRow, jsonColumn1: " + transformedJson +
+                  " (identity: " + System.identityHashCode(transformedJson) + ")");
+
           _indexCreator.indexRow(row);
-//          System.out.println("  AFTER indexRow - Row identity: " + System.identityHashCode(row) +
-//                  ", jsonColumn1: " + row.getValue("jsonColumn1"));
+
+          System.out.println("BUILD row " + rowNum + " - AFTER indexRow, jsonColumn1: " + row.getValue("jsonColumn1"));
         }
         _totalIndexTimeNs += System.nanoTime() - recordReadStopTimeNs;
         _incompleteRowsFound += result.getIncompleteRowCount();
         _skippedRowsFound += result.getSkippedRowCount();
         _sanitizedRowsFound += result.getSanitizedRowCount();
+        rowNum++;
       }
+      System.out.println("=== FINISHED MAIN INDEX BUILD LOOP ===");
     } catch (Exception e) {
       _indexCreator.close();
       throw e;
