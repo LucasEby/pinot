@@ -23,7 +23,6 @@ import java.io.File;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -123,7 +122,7 @@ public class SegmentGeneratorConfig implements Serializable {
   private final Map<String, FieldIndexConfigs> _indexConfigsByColName;
 
   // constructed from FieldConfig
-  private final Map<String, Map<String, String>> _columnProperties = new HashMap<>();
+  private final Map<String, Map<String, String>> _columnProperties = new TreeMap<>();
 
   private SegmentZKPropsConfig _segmentZKPropsConfig;
 

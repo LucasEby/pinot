@@ -740,9 +740,10 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
             (_segmentStats != null ? _segmentStats.getClass().getName() : "null") + " ===");
     System.out.println("=== collectStatsAndIndexCreationInfo: gatherStats complete ===");
 
-    _totalDocs = _segmentStats.getTotalDocCount();
+    _totalDocs = _segmentStats.getTotalDocCount(); // is 7 whether passes or fails
     Map<String, FieldIndexConfigs> indexConfigsMap = _config.getIndexConfigsByColName();
 
+    System.out.println("Total number of FieldSpecs: " + _dataSchema.getAllFieldSpecs().size());
     for (FieldSpec fieldSpec : _dataSchema.getAllFieldSpecs()) {
       // Ignore virtual columns
       if (fieldSpec.isVirtualColumn()) {
@@ -771,6 +772,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
         System.out.println("    ColumnStatistics identity: " + System.identityHashCode(columnProfile));
         System.out.println("    ColumnIndexCreationInfo identity: " + System.identityHashCode(creationInfo));
         System.out.println("    Distinct values: " + creationInfo.getDistinctValueCount());
+        System.out.println("    Total number of entries: " + creationInfo.getTotalNumberOfEntries());
 
         Object sortedElements = creationInfo.getSortedUniqueElementsArray();
         if (sortedElements != null && sortedElements.getClass().isArray()) {

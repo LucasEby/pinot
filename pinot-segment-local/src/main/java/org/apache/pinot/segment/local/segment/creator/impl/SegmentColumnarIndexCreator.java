@@ -26,7 +26,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -94,14 +94,14 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   static final int METADATA_PROPERTY_LENGTH_LIMIT = 512;
   private SegmentGeneratorConfig _config;
   private TreeMap<String, ColumnIndexCreationInfo> _indexCreationInfoMap;
-  private final Map<String, SegmentDictionaryCreator> _dictionaryCreatorMap = new HashMap<>();
+  private final Map<String, SegmentDictionaryCreator> _dictionaryCreatorMap = new LinkedHashMap<>();
   /**
    * Contains, indexed by column name, the creator associated with each index type.
    *
    * Indexes whose build lifecycle is not DURING_SEGMENT_CREATION are not included here.
    */
-  private Map<String, Map<IndexType<?, ?, ?>, IndexCreator>> _creatorsByColAndIndex = new HashMap<>();
-  private final Map<String, NullValueVectorCreator> _nullValueVectorCreatorMap = new HashMap<>();
+  private Map<String, Map<IndexType<?, ?, ?>, IndexCreator>> _creatorsByColAndIndex = new LinkedHashMap<>();
+  private final Map<String, NullValueVectorCreator> _nullValueVectorCreatorMap = new LinkedHashMap<>();
   private String _segmentName;
   private Schema _schema;
   private File _indexDir;
@@ -131,7 +131,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
     Map<String, FieldIndexConfigs> indexConfigs = segmentCreationSpec.getIndexConfigsByColName();
 
-    _creatorsByColAndIndex = Maps.newHashMapWithExpectedSize(indexConfigs.keySet().size());
+    _creatorsByColAndIndex = Maps.newLinkedHashMapWithExpectedSize(indexConfigs.keySet().size());
 
     for (String columnName : indexConfigs.keySet()) {
       FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
@@ -209,7 +209,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       }
 
       Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex =
-          Maps.newHashMapWithExpectedSize(IndexService.getInstance().getAllIndexes().size());
+          Maps.newLinkedHashMapWithExpectedSize(IndexService.getInstance().getAllIndexes().size());
       for (IndexType<?, ?, ?> index : IndexService.getInstance().getAllIndexes()) {
         if (index.getIndexBuildLifecycle() != IndexType.BuildLifecycle.DURING_SEGMENT_CREATION) {
           continue;

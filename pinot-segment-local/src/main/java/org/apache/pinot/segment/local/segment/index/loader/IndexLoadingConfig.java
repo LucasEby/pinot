@@ -20,8 +20,8 @@ package org.apache.pinot.segment.local.segment.index.loader;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -82,7 +82,7 @@ public class IndexLoadingConfig {
   private boolean _enableDynamicStarTreeCreation;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
   private boolean _enableDefaultStarTree;
-  private Map<String, FieldIndexConfigs> _indexConfigsByColName = new HashMap<>();
+  private Map<String, FieldIndexConfigs> _indexConfigsByColName = new LinkedHashMap<>();
 
   private boolean _dirty = true;
 
@@ -315,7 +315,7 @@ public class IndexLoadingConfig {
   }
 
   public PinotConfiguration getSegmentDirectoryConfigs() {
-    Map<String, Object> props = new HashMap<>();
+    Map<String, Object> props = new LinkedHashMap<>();
     props.put(READ_MODE_KEY, _readMode);
     return new PinotConfiguration(props);
   }
@@ -408,7 +408,7 @@ public class IndexLoadingConfig {
 
   public void addKnownColumns(Set<String> columns) {
     if (_knownColumns == null) {
-      _knownColumns = new HashSet<>(columns);
+      _knownColumns = new LinkedHashSet<>(columns);
     } else {
       _knownColumns.addAll(columns);
     }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.creator;
 
+import java.util.Map;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.SegmentPreIndexStatsCollectorImpl;
 import org.apache.pinot.segment.spi.creator.SegmentCreationDataSource;
