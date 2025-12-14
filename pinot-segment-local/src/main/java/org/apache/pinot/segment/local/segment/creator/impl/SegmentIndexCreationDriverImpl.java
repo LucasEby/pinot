@@ -251,6 +251,39 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     return null;
   }
 
+  // Helper method to inspect what's in _indexCreationInfoMap
+  private void inspectIndexCreationInfo() {
+    if (_indexCreationInfoMap == null) {
+      System.out.println("  _indexCreationInfoMap is null");
+      return;
+    }
+
+    ColumnIndexCreationInfo jsonInfo = _indexCreationInfoMap.get("jsonColumn1");
+    if (jsonInfo == null) {
+      System.out.println("  No jsonColumn1 in _indexCreationInfoMap");
+      return;
+    }
+
+    System.out.println("  jsonColumn1 distinct value count: " + jsonInfo.getDistinctValueCount());
+    System.out.println("  jsonColumn1 total entries: " + jsonInfo.getTotalNumberOfEntries());
+
+    Object sortedElements = jsonInfo.getSortedUniqueElementsArray();
+    System.out.println("  jsonColumn1 sorted elements identity: " + System.identityHashCode(sortedElements));
+    System.out.println("  jsonColumn1 sorted elements type: " +
+            (sortedElements != null ? sortedElements.getClass().getName() : "null"));
+
+    // If it's an array, print some values
+    if (sortedElements != null && sortedElements.getClass().isArray()) {
+      int length = java.lang.reflect.Array.getLength(sortedElements);
+      System.out.println("  jsonColumn1 sorted elements array length: " + length);
+      for (int i = 0; i < Math.min(5, length); i++) {
+        Object elem = java.lang.reflect.Array.get(sortedElements, i);
+        System.out.println("    Element " + i + ": " + elem +
+                " (identity: " + System.identityHashCode(elem) + ")");
+      }
+    }
+  }
+
   @Override
   public void build()
       throws Exception {
@@ -412,6 +445,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
   private void handlePostCreation()
       throws Exception {
+    System.out.println("=== ENTERING handlePostCreation ===");
     ColumnStatistics timeColumnStatistics = _segmentStats.getColumnProfileFor(_config.getTimeColumnName());
     int sequenceId = _config.getSequenceId();
     if (timeColumnStatistics != null) {
@@ -433,11 +467,14 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     }
 
     try {
+      System.out.println("=== CHECKPOINT A: BEFORE _indexCreator.seal ===");
       // Write the index files to disk
       _indexCreator.setSegmentName(_segmentName);
       _indexCreator.seal();
+      System.out.println("=== CHECKPOINT B: AFTER _indexCreator.seal ===");
     } finally {
       _indexCreator.close();
+      System.out.println("=== CHECKPOINT C: AFTER _indexCreator.close ===");
     }
     LOGGER.info("Finished segment seal!");
 
@@ -454,13 +491,22 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     // Delete the temporary directory
     FileUtils.deleteQuietly(_tempIndexDir);
 
+    System.out.println("=== CHECKPOINT D: BEFORE convertFormatIfNecessary ===");
     convertFormatIfNecessary(segmentOutputDir);
+    System.out.println("=== CHECKPOINT E: AFTER convertFormatIfNecessary ===");
 
     if (_totalDocs > 0) {
+      System.out.println("=== CHECKPOINT F: BEFORE buildStarTreeV2IfNecessary ===");
       buildStarTreeV2IfNecessary(segmentOutputDir);
+      System.out.println("=== CHECKPOINT G: AFTER buildStarTreeV2IfNecessary ===");
+      System.out.println("=== CHECKPOINT H: BEFORE buildMultiColumnTextIndex ===");
       buildMultiColumnTextIndex(segmentOutputDir);
+      System.out.println("=== CHECKPOINT I: AFTER buildMultiColumnTextIndex ===");
     }
+
+    System.out.println("=== CHECKPOINT J: BEFORE updatePostSegmentCreationIndexes ===");
     updatePostSegmentCreationIndexes(segmentOutputDir);
+    System.out.println("=== CHECKPOINT K: AFTER updatePostSegmentCreationIndexes ===");
 
     // Compute CRC and creation time
     long crc = CrcUtils.forAllFilesInFolder(segmentOutputDir).computeCrc();
@@ -483,6 +529,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     LOGGER.info("Driver, record read time (in ms) : {}", TimeUnit.NANOSECONDS.toMillis(_totalRecordReadTimeNs));
     LOGGER.info("Driver, stats collector time (in ms) : {}", TimeUnit.NANOSECONDS.toMillis(_totalStatsCollectorTimeNs));
     LOGGER.info("Driver, indexing time (in ms) : {}", TimeUnit.NANOSECONDS.toMillis(_totalIndexTimeNs));
+    System.out.println("=== EXITING handlePostCreation ===");
   }
 
   private void buildMultiColumnTextIndex(File segmentOutputDir)
@@ -582,13 +629,17 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   // copy for indexes for which we don't know sizes upfront.
   private void convertFormatIfNecessary(File segmentDirectory)
       throws Exception {
+    System.out.println("=== convertFormatIfNecessary: segmentVersion = " + _config.getSegmentVersion() + " ===");
     SegmentVersion versionToGenerate = _config.getSegmentVersion();
     if (versionToGenerate.equals(SegmentVersion.v1)) {
+      System.out.println("=== convertFormatIfNecessary: v1, returning early ===");
       // v1 by default
       return;
     }
+    System.out.println("=== convertFormatIfNecessary: converting to v3 ===");
     SegmentFormatConverter converter = SegmentFormatConverterFactory.getConverter(SegmentVersion.v1, SegmentVersion.v3);
     converter.convert(segmentDirectory);
+    System.out.println("=== convertFormatIfNecessary: conversion complete ===");
   }
 
   @Override
@@ -610,20 +661,86 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   /**
    * Complete the stats gathering process and store the stats information in indexCreationInfoMap.
    */
-  void collectStatsAndIndexCreationInfo()
-      throws Exception {
+//  void collectStatsAndIndexCreationInfo()
+//      throws Exception {
+//    long statsCollectorStartTime = System.nanoTime();
+//
+//    System.out.println("SegmentIndexCreationDriverImpl START: collectStatsAndIndexCreationInfo");
+//    // Initialize stats collection
+//    _segmentStats = _dataSource.gatherStats(
+//        new StatsCollectorConfig(_config.getTableConfig(), _dataSchema, _config.getSegmentPartitionConfig()));
+//
+//    System.out.println("=== collectStatsAndIndexCreationInfo: gatherStats complete ===");
+//
+//    _totalDocs = _segmentStats.getTotalDocCount();
+//    Map<String, FieldIndexConfigs> indexConfigsMap = _config.getIndexConfigsByColName();
+//
+//    for (FieldSpec fieldSpec : _dataSchema.getAllFieldSpecs()) {
+//      // Ignore virtual columns
+//      // System.out.println("Field spec: " + fieldSpec + " isVirtualColumn? " + fieldSpec.isVirtualColumn());
+//      if (fieldSpec.isVirtualColumn()) {
+//        continue;
+//      }
+//
+//      String column = fieldSpec.getName();
+//      DataType storedType = fieldSpec.getDataType().getStoredType();
+//      ColumnStatistics columnProfile = _segmentStats.getColumnProfileFor(column);
+//      DictionaryIndexConfig dictionaryIndexConfig = indexConfigsMap.get(column).getConfig(StandardIndexes.dictionary());
+//      boolean createDictionary = dictionaryIndexConfig.isDisabled();
+//      boolean useVarLengthDictionary = dictionaryIndexConfig.getUseVarLengthDictionary()
+//          || DictionaryIndexType.optimizeTypeShouldUseVarLengthDictionary(storedType, columnProfile);
+//      Object defaultNullValue = fieldSpec.getDefaultNullValue();
+//      if (storedType == DataType.BYTES) {
+//        defaultNullValue = new ByteArray((byte[]) defaultNullValue);
+//      }
+//      _indexCreationInfoMap.put(column,
+//          new ColumnIndexCreationInfo(columnProfile, createDictionary, useVarLengthDictionary, false/*isAutoGenerated*/,
+//              defaultNullValue));
+//
+//      if ("jsonColumn1".equals(column)) {
+//        System.out.println("  Creating ColumnIndexCreationInfo for jsonColumn1");
+//        System.out.println("    ColumnStatistics identity: " + System.identityHashCode(columnProfile));
+//        System.out.println("    ColumnIndexCreationInfo identity: " + System.identityHashCode(creationInfo));
+//        System.out.println("    Distinct values: " + creationInfo.getDistinctValueCount());
+//
+//        Object sortedElements = creationInfo.getSortedUniqueElementsArray();
+//        if (sortedElements != null && sortedElements.getClass().isArray()) {
+//          int length = java.lang.reflect.Array.getLength(sortedElements);
+//          System.out.println("    Sorted elements array length: " + length);
+//          for (int i = 0; i < Math.min(3, length); i++) {
+//            Object elem = java.lang.reflect.Array.get(sortedElements, i);
+//            System.out.println("      Element " + i + ": " + elem +
+//                    " (identity: " + System.identityHashCode(elem) + ")");
+//          }
+//        }
+//      }
+//
+//      // Now put it in the map
+//      _indexCreationInfoMap.put(column, creationInfo);
+//    }
+//
+//    _segmentIndexCreationInfo.setTotalDocs(_totalDocs);
+//    _totalStatsCollectorTimeNs = System.nanoTime() - statsCollectorStartTime;
+//
+//    System.out.println("=== collectStatsAndIndexCreationInfo: END ===");
+//    inspectIndexCreationInfo();
+//  }
+
+  void collectStatsAndIndexCreationInfo() throws Exception {
     long statsCollectorStartTime = System.nanoTime();
 
-    System.out.println("SegmentIndexCreationDriverImpl START: collectStatsAndIndexCreationInfo");
-    // Initialize stats collection
+    System.out.println("=== collectStatsAndIndexCreationInfo: START ===");
+
     _segmentStats = _dataSource.gatherStats(
-        new StatsCollectorConfig(_config.getTableConfig(), _dataSchema, _config.getSegmentPartitionConfig()));
+            new StatsCollectorConfig(_config.getTableConfig(), _dataSchema, _config.getSegmentPartitionConfig()));
+
+    System.out.println("=== collectStatsAndIndexCreationInfo: gatherStats complete ===");
+
     _totalDocs = _segmentStats.getTotalDocCount();
     Map<String, FieldIndexConfigs> indexConfigsMap = _config.getIndexConfigsByColName();
 
     for (FieldSpec fieldSpec : _dataSchema.getAllFieldSpecs()) {
       // Ignore virtual columns
-      // System.out.println("Field spec: " + fieldSpec + " isVirtualColumn? " + fieldSpec.isVirtualColumn());
       if (fieldSpec.isVirtualColumn()) {
         continue;
       }
@@ -634,18 +751,44 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       DictionaryIndexConfig dictionaryIndexConfig = indexConfigsMap.get(column).getConfig(StandardIndexes.dictionary());
       boolean createDictionary = dictionaryIndexConfig.isDisabled();
       boolean useVarLengthDictionary = dictionaryIndexConfig.getUseVarLengthDictionary()
-          || DictionaryIndexType.optimizeTypeShouldUseVarLengthDictionary(storedType, columnProfile);
+              || DictionaryIndexType.optimizeTypeShouldUseVarLengthDictionary(storedType, columnProfile);
       Object defaultNullValue = fieldSpec.getDefaultNullValue();
       if (storedType == DataType.BYTES) {
         defaultNullValue = new ByteArray((byte[]) defaultNullValue);
       }
-      _indexCreationInfoMap.put(column,
-          new ColumnIndexCreationInfo(columnProfile, createDictionary, useVarLengthDictionary, false/*isAutoGenerated*/,
-              defaultNullValue));
+
+      // Create the info object
+      ColumnIndexCreationInfo creationInfo = new ColumnIndexCreationInfo(columnProfile, createDictionary,
+              useVarLengthDictionary, false, defaultNullValue);
+
+      // PUT THE DEBUG CODE HERE, BEFORE putting into the map
+      if ("jsonColumn1".equals(column)) {
+        System.out.println("  Creating ColumnIndexCreationInfo for jsonColumn1");
+        System.out.println("    ColumnStatistics identity: " + System.identityHashCode(columnProfile));
+        System.out.println("    ColumnIndexCreationInfo identity: " + System.identityHashCode(creationInfo));
+        System.out.println("    Distinct values: " + creationInfo.getDistinctValueCount());
+
+        Object sortedElements = creationInfo.getSortedUniqueElementsArray();
+        if (sortedElements != null && sortedElements.getClass().isArray()) {
+          int length = java.lang.reflect.Array.getLength(sortedElements);
+          System.out.println("    Sorted elements array length: " + length);
+          for (int i = 0; i < Math.min(3, length); i++) {
+            Object elem = java.lang.reflect.Array.get(sortedElements, i);
+            System.out.println("      Element " + i + ": " + elem +
+                    " (identity: " + System.identityHashCode(elem) + ")");
+          }
+        }
+      }
+
+      // Now put it in the map
+      _indexCreationInfoMap.put(column, creationInfo);
     }
+
     _segmentIndexCreationInfo.setTotalDocs(_totalDocs);
     _totalStatsCollectorTimeNs = System.nanoTime() - statsCollectorStartTime;
-      System.out.println("SegmentIndexCreationDriverImpl END: collectStatsAndIndexCreaationInfo");
+
+    System.out.println("=== collectStatsAndIndexCreationInfo: END ===");
+    inspectIndexCreationInfo();
   }
 
   /**
