@@ -66,6 +66,15 @@ public class AvroRecordReader implements RecordReader {
       throws IOException {
     // System.out.println("===========");
     // System.out.println("AVRO RECORD BEFORE NEXT: " + _reusableAvroRecord);
+    try {
+        System.out.println("AvroRecord identity _reusableAvroRecord Before: " + System.identityHashCode(_reusableAvroRecord) +
+                ", jsonColumn1 value identity: " +
+                System.identityHashCode(_reusableAvroRecord.get("jsonColumn1")));
+    } catch (Exception e) {
+            System.out.println("Exception thrown in before");
+    }
+
+      System.out.println("AvroRecord identity Reuse before: " + System.identityHashCode(reuse));
     _reusableAvroRecord = _avroReader.next(_reusableAvroRecord);
 
     // System.out.println("Names of all active threads:");
@@ -79,6 +88,14 @@ public class AvroRecordReader implements RecordReader {
     // System.out.println("AVRO RECORD AFTER EXTRACTION: " + _reusableAvroRecord);
     // System.out.println("REUSE: " + reuse);
     // System.out.println("===========");
+      try {
+          System.out.println("AvroRecord identity _reusableAvroRecord after: " + System.identityHashCode(_reusableAvroRecord) +
+                  ", jsonColumn1 value identity: " +
+                  System.identityHashCode(_reusableAvroRecord.get("jsonColumn1")));
+      } catch (Exception e) {
+            System.out.println("Exception thrown in before");
+        }
+  System.out.println("AvroRecord identity Reuse after: " + System.identityHashCode(reuse));
     return reuse;
   }
 
@@ -87,6 +104,7 @@ public class AvroRecordReader implements RecordReader {
       throws IOException {
     _avroReader.close();
     _avroReader = AvroUtils.getAvroReader(_dataFile);
+    _reusableAvroRecord = null;
   }
 
   @Override
