@@ -48,39 +48,119 @@ public class RecordReaderSegmentCreationDataSource implements SegmentCreationDat
     _transformPipeline = transformPipeline;
   }
 
+//  @Override
+//  public SegmentPreIndexStatsCollector gatherStats(StatsCollectorConfig statsCollectorConfig) {
+//    try {
+//      TransformPipeline transformPipeline = _transformPipeline != null ? _transformPipeline
+//          : new TransformPipeline(statsCollectorConfig.getTableConfig(), statsCollectorConfig.getSchema());
+//
+//      SegmentPreIndexStatsCollector collector = new SegmentPreIndexStatsCollectorImpl(statsCollectorConfig);
+//      collector.init();
+//
+//      // Gather the stats
+//      GenericRow reuse = new GenericRow();
+//      TransformPipeline.Result reusedResult = new TransformPipeline.Result();
+//      while (_recordReader.hasNext()) {
+//        reuse.clear();
+//
+//        reuse = _recordReader.next(reuse);
+//        transformPipeline.processRow(reuse, reusedResult);
+//        System.out.println("REUSE: " + reuse);
+//          System.out.println("REUSEDRESULT: " + reusedResult);
+//        System.out.println("RecordReaderSegmentCreationDataSource: AFTER TRANSFORM PIPELINE");
+//        for (GenericRow row : reusedResult.getTransformedRows()) {
+//          collector.collectRow(row);
+//        }
+//      }
+//
+//      collector.build();
+//      System.out.println("Collectors results: " + collector);
+//      return collector;
+//    } catch (Exception e) {
+//      LOGGER.error("Caught exception while gathering stats", e);
+//      Utils.rethrowException(e);
+//      return null;
+//    }
+//      System.out.println("RecordReaderSegmentCreationDataSource: End of gatherStats");
+//  }
+
   @Override
   public SegmentPreIndexStatsCollector gatherStats(StatsCollectorConfig statsCollectorConfig) {
+    System.out.println("!!! GATHERSTATS ENTRY POINT !!!");
+
     try {
+      System.out.println("!!! GATHERSTATS - INSIDE TRY BLOCK !!!");
+
       TransformPipeline transformPipeline = _transformPipeline != null ? _transformPipeline
-          : new TransformPipeline(statsCollectorConfig.getTableConfig(), statsCollectorConfig.getSchema());
+              : new TransformPipeline(statsCollectorConfig.getTableConfig(), statsCollectorConfig.getSchema());
+
+      System.out.println("!!! GATHERSTATS - CREATED TRANSFORM PIPELINE !!!");
 
       SegmentPreIndexStatsCollector collector = new SegmentPreIndexStatsCollectorImpl(statsCollectorConfig);
       collector.init();
 
-      // Gather the stats
+      System.out.println("!!! GATHERSTATS - COLLECTOR INITIALIZED !!!");
+
       boolean continueOnError =
-          statsCollectorConfig.getTableConfig().getIngestionConfig() != null && statsCollectorConfig.getTableConfig()
-              .getIngestionConfig().isContinueOnError();
+              statsCollectorConfig.getTableConfig().getIngestionConfig() != null && statsCollectorConfig.getTableConfig()
+                      .getIngestionConfig().isContinueOnError();
       GenericRow reuse = new GenericRow();
+      int rowNum = 0;
+
+      System.out.println("!!! GATHERSTATS - STARTING WHILE LOOP !!!");
+
       while (_recordReader.hasNext()) {
         reuse.clear();
         try {
           reuse = _recordReader.next(reuse);
+
+          // DEBUG THE RAW AVRO VALUE
+          Object jsonValue = reuse.getValue("jsonColumn1");
+          System.out.println("gatherStats row " + rowNum + " - RAW jsonColumn1 value: " + jsonValue +
+                  " (identity: " + System.identityHashCode(jsonValue) +
+                  ", hashCode: " + (jsonValue != null ? jsonValue.hashCode() : "null") + ")");
+
+          // If it's a Map, print its entries with identities
+          if (jsonValue instanceof Map) {
+            Map<?, ?> map = (Map<?, ?>) jsonValue;
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+              System.out.println("  RAW Map entry: " + entry.getKey() + "=" + entry.getValue() +
+                      " (key id: " + System.identityHashCode(entry.getKey()) +
+                      ", value id: " + System.identityHashCode(entry.getValue()) + ")");
+            }
+          }
+
           TransformPipeline.Result result = transformPipeline.processRow(reuse);
           for (GenericRow row : result.getTransformedRows()) {
+            Object transformedJson = row.getValue("jsonColumn1");
+            System.out.println("  After transform - jsonColumn1: " + transformedJson +
+                    " (identity: " + System.identityHashCode(transformedJson) +
+                    ", hashCode: " + (transformedJson != null ? transformedJson.hashCode() : "null") + ")");
+
             collector.collectRow(row);
           }
+          rowNum++;
         } catch (Exception e) {
+          System.out.println("!!! GATHERSTATS - EXCEPTION IN INNER TRY: " + e.getMessage() + " !!!");
+
           if (!continueOnError) {
             throw new RuntimeException("Caught exception while reading data", e);
           }
           LOGGER.debug("Caught exception while reading data", e);
         }
       }
+
+      System.out.println("!!! GATHERSTATS - FINISHED WHILE LOOP, rowNum=" + rowNum + " !!!");
+
       transformPipeline.reportStats();
       collector.build();
+
+      System.out.println("!!! GATHERSTATS - RETURNING COLLECTOR !!!");
+
       return collector;
     } catch (Exception e) {
+      System.out.println("!!! GATHERSTATS - EXCEPTION IN OUTER TRY: " + e.getMessage() + " !!!");
+
       LOGGER.error("Caught exception while gathering stats", e);
       Utils.rethrowException(e);
       return null;

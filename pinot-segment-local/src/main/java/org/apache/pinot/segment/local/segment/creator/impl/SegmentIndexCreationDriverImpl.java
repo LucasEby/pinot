@@ -730,10 +730,14 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     long statsCollectorStartTime = System.nanoTime();
 
     System.out.println("=== collectStatsAndIndexCreationInfo: START ===");
+    System.out.println("=== _dataSource class: " + _dataSource.getClass().getName() + " ===");
+    System.out.println("=== _dataSource toString: " + _dataSource + " ===");
 
     _segmentStats = _dataSource.gatherStats(
             new StatsCollectorConfig(_config.getTableConfig(), _dataSchema, _config.getSegmentPartitionConfig()));
 
+    System.out.println("=== gatherStats returned, _segmentStats class: " +
+            (_segmentStats != null ? _segmentStats.getClass().getName() : "null") + " ===");
     System.out.println("=== collectStatsAndIndexCreationInfo: gatherStats complete ===");
 
     _totalDocs = _segmentStats.getTotalDocCount();
