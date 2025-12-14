@@ -20,6 +20,7 @@ package org.apache.pinot.plugin.inputformat.avro;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.avro.file.DataFileStream;
@@ -61,41 +62,103 @@ public class AvroRecordReader implements RecordReader {
     return _avroReader.hasNext();
   }
 
+//  @Override
+//  public GenericRow next(GenericRow reuse)
+//      throws IOException {
+//    // System.out.println("===========");
+//    // System.out.println("AVRO RECORD BEFORE NEXT: " + _reusableAvroRecord);
+//    try {
+//        System.out.println("AvroRecord identity _reusableAvroRecord Before: " + System.identityHashCode(_reusableAvroRecord) +
+//                ", jsonColumn1 value identity: " +
+//                System.identityHashCode(_reusableAvroRecord.get("jsonColumn1")));
+//    } catch (Exception e) {
+//            System.out.println("Exception thrown in before");
+//    }
+//
+//      System.out.println("AvroRecord identity Reuse before: " + System.identityHashCode(reuse));
+//    _reusableAvroRecord = _avroReader.next(_reusableAvroRecord);
+//
+//    // System.out.println("Names of all active threads:");
+//    //     Map<Thread, StackTraceElement[]> allThreads = Thread.getAllStackTraces();
+//    //     for (Thread thread : allThreads.keySet()) {
+//    //         System.out.println(thread.getName());
+//    //     }
+//
+//    // System.out.println("AVRO RECORD BEFORE EXTRACTION: " + _reusableAvroRecord);
+//    _recordExtractor.extract(_reusableAvroRecord, reuse);
+//    // System.out.println("AVRO RECORD AFTER EXTRACTION: " + _reusableAvroRecord);
+//    // System.out.println("REUSE: " + reuse);
+//    // System.out.println("===========");
+//      try {
+//          System.out.println("AvroRecord identity _reusableAvroRecord after: " + System.identityHashCode(_reusableAvroRecord) +
+//                  ", jsonColumn1 value identity: " +
+//                  System.identityHashCode(_reusableAvroRecord.get("jsonColumn1")));
+//      } catch (Exception e) {
+//            System.out.println("Exception thrown in before");
+//        }
+//  System.out.println("AvroRecord identity Reuse after: " + System.identityHashCode(reuse));
+//    return reuse;
+//  }
+
   @Override
-  public GenericRow next(GenericRow reuse)
-      throws IOException {
-    // System.out.println("===========");
-    // System.out.println("AVRO RECORD BEFORE NEXT: " + _reusableAvroRecord);
+  public GenericRow next(GenericRow reuse) throws IOException {
     try {
-        System.out.println("AvroRecord identity _reusableAvroRecord Before: " + System.identityHashCode(_reusableAvroRecord) +
-                ", jsonColumn1 value identity: " +
-                System.identityHashCode(_reusableAvroRecord.get("jsonColumn1")));
+      Object jsonValue = _reusableAvroRecord.get("jsonColumn1");
+      System.out.println("BEFORE - AvroRecord: " + System.identityHashCode(_reusableAvroRecord) +
+              ", jsonColumn1: " + System.identityHashCode(jsonValue) +
+              ", value: " + jsonValue);
+      if (jsonValue instanceof Map) {
+        Map<?, ?> map = (Map<?, ?>) jsonValue;
+        System.out.println("  Map size: " + map.size());
+        for (Map.Entry<?, ?> entry : map.entrySet()) {
+          System.out.println("    Key: " + entry.getKey() +
+                  " (id: " + System.identityHashCode(entry.getKey()) + ")" +
+                  ", Value: " + entry.getValue() +
+                  " (id: " + System.identityHashCode(entry.getValue()) + ")");
+        }
+      }
     } catch (Exception e) {
-            System.out.println("Exception thrown in before");
+      System.out.println("BEFORE - Exception (first call): " + e.getMessage());
     }
 
-      System.out.println("AvroRecord identity Reuse before: " + System.identityHashCode(reuse));
     _reusableAvroRecord = _avroReader.next(_reusableAvroRecord);
-
-    // System.out.println("Names of all active threads:");
-    //     Map<Thread, StackTraceElement[]> allThreads = Thread.getAllStackTraces();
-    //     for (Thread thread : allThreads.keySet()) {
-    //         System.out.println(thread.getName());
-    //     }
-
-    // System.out.println("AVRO RECORD BEFORE EXTRACTION: " + _reusableAvroRecord);
     _recordExtractor.extract(_reusableAvroRecord, reuse);
-    // System.out.println("AVRO RECORD AFTER EXTRACTION: " + _reusableAvroRecord);
-    // System.out.println("REUSE: " + reuse);
-    // System.out.println("===========");
-      try {
-          System.out.println("AvroRecord identity _reusableAvroRecord after: " + System.identityHashCode(_reusableAvroRecord) +
-                  ", jsonColumn1 value identity: " +
-                  System.identityHashCode(_reusableAvroRecord.get("jsonColumn1")));
-      } catch (Exception e) {
-            System.out.println("Exception thrown in before");
+
+    try {
+      Object jsonValue = _reusableAvroRecord.get("jsonColumn1");
+      System.out.println("AFTER - AvroRecord: " + System.identityHashCode(_reusableAvroRecord) +
+              ", jsonColumn1: " + System.identityHashCode(jsonValue) +
+              ", value: " + jsonValue);
+      if (jsonValue instanceof Map) {
+        Map<?, ?> map = (Map<?, ?>) jsonValue;
+        System.out.println("  Map size: " + map.size());
+        for (Map.Entry<?, ?> entry : map.entrySet()) {
+          System.out.println("    Key: " + entry.getKey() +
+                  " (id: " + System.identityHashCode(entry.getKey()) + ")" +
+                  ", Value: " + entry.getValue() +
+                  " (id: " + System.identityHashCode(entry.getValue()) + ")");
         }
-  System.out.println("AvroRecord identity Reuse after: " + System.identityHashCode(reuse));
+      }
+
+      Object reuseValue = reuse.getValue("jsonColumn1");
+      System.out.println("REUSE - GenericRow: " + System.identityHashCode(reuse) +
+              ", jsonColumn1: " + System.identityHashCode(reuseValue) +
+              ", value: " + reuseValue);
+      if (reuseValue instanceof Map) {
+        Map<?, ?> map = (Map<?, ?>) reuseValue;
+        System.out.println("  Map size: " + map.size());
+        for (Map.Entry<?, ?> entry : map.entrySet()) {
+          System.out.println("    Key: " + entry.getKey() +
+                  " (id: " + System.identityHashCode(entry.getKey()) + ")" +
+                  ", Value: " + entry.getValue() +
+                  " (id: " + System.identityHashCode(entry.getValue()) + ")");
+        }
+      }
+    } catch (Exception e) {
+      System.out.println("AFTER - Exception: " + e.getMessage());
+    }
+
+    System.out.println("---");
     return reuse;
   }
 
