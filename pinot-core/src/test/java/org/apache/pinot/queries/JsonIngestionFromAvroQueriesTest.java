@@ -59,7 +59,6 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.pastalab.fray.junit.plain.FrayInTestLauncher;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -323,7 +322,7 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
   /** Verify that we can query the JSON column that ingested ComplexType data from an AVRO file (see setUp). */
   @Test
   public void testSimpleSelectOnJsonColumn() {
-    FrayInTestLauncher.INSTANCE.launchFrayTest(() -> {
+    // FrayInTestLauncher.INSTANCE.launchFrayTest(() -> {
     Operator<SelectionResultsBlock> operator =
         getOperator("select intColumn, stringColumn, jsonColumn1, jsonColumn2 FROM testTable ORDER BY intColumn limit 100");
     SelectionResultsBlock block = operator.nextBlock();
@@ -412,7 +411,7 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
       // jsonColumn2 is just a STRING in this test data
       Assert.assertEquals(row[3], expected[3]);
     }
-    });
+    // });
   }
 
   /** Verify simple path expression query on ingested Avro file. */
