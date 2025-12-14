@@ -293,6 +293,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
           // result = _transformPipeline.processRow(decodedRow);
 
           GenericRow decodedRow = _recordReader.next(reuse);
+//          System.out.println("BUILD LOOP - decodedRow identity: " + System.identityHashCode(decodedRow) +
+//                  ", reuse identity: " + System.identityHashCode(reuse) +
+//                  ", same object? " + (decodedRow == reuse));
 
           // DEFENSIVE COPY: Create a safe copy to prevent row reuse corruption
           GenericRow safeCopy = decodedRow.copy();
@@ -312,7 +315,13 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
         }
 
         for (GenericRow row : result.getTransformedRows()) {
+//          System.out.println("  Transformed row identity: " + System.identityHashCode(row) +
+//                  ", same as reuse? " + (row == reuse) +
+//                  ", jsonColumn1 identity: " + System.identityHashCode(row.getValue("jsonColumn1")) +
+//                  ", value: " + row.getValue("jsonColumn1"));
           _indexCreator.indexRow(row);
+//          System.out.println("  AFTER indexRow - Row identity: " + System.identityHashCode(row) +
+//                  ", jsonColumn1: " + row.getValue("jsonColumn1"));
         }
         _totalIndexTimeNs += System.nanoTime() - recordReadStopTimeNs;
         _incompleteRowsFound += result.getIncompleteRowCount();
@@ -327,13 +336,16 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     }
 
     if (_incompleteRowsFound > 0) {
+      System.out.println("Incomplete data found for " + _incompleteRowsFound + " records. This can be due to error during reader or transformations");
       LOGGER.warn("Incomplete data found for {} records. This can be due to error during reader or transformations",
           _incompleteRowsFound);
     }
     if (_skippedRowsFound > 0) {
+      System.out.println("Skipped " + _skippedRowsFound + " records during transformation");
       LOGGER.info("Skipped {} records during transformation", _skippedRowsFound);
     }
     if (_sanitizedRowsFound > 0) {
+      System.out.println("Sanitized " + _sanitizedRowsFound + " records during transformation");
       LOGGER.info("Sanitized {} records during transformation", _sanitizedRowsFound);
     }
 
