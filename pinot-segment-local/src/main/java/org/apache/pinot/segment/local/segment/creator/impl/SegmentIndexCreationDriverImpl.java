@@ -37,6 +37,7 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.metrics.MinionMetrics;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.realtime.converter.stats.RealtimeSegmentSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.RecordReaderSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
@@ -49,6 +50,7 @@ import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.segment.local.utils.CrcUtils;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.converter.SegmentFormatConverter;
@@ -61,6 +63,7 @@ import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsContainer;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.IndexHandler;
@@ -69,6 +72,8 @@ import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
@@ -323,7 +328,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
         long recordReadStopTimeNs;
         reuse.clear();
 
-//        TransformPipeline.Result result;
+       TransformPipeline.Result result;
         try {
           long recordReadStartTimeNs = System.nanoTime();
 
@@ -353,12 +358,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
               }
             }
           }
-            rowToStringIdentity.put(rowNum, copiedIdentity);
-          } else {
-              System.out.println("copiedJson is a " + copiedJson.getClass().getName());
-          }
+          rowToStringIdentity.put(rowNum, copiedIdentity);
 
-          TransformPipeline.Result result = _transformPipeline.processRow(safeCopy);
+          result = _transformPipeline.processRow(safeCopy);
 
           recordReadStopTimeNs = System.nanoTime();
           _totalRecordReadTimeNs += recordReadStopTimeNs - recordReadStartTimeNs;
@@ -475,7 +477,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
   private void handlePostCreation()
       throws Exception {
-    System.out.println("=== ENTERING handlePostCreation ===");
     ColumnStatistics timeColumnStatistics = _segmentStats.getColumnProfileFor(_config.getTimeColumnName());
     int sequenceId = _config.getSequenceId();
     if (timeColumnStatistics != null) {
@@ -497,14 +498,13 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     }
 
     try {
-      System.out.println("=== CHECKPOINT A: BEFORE _indexCreator.seal ===");
       // Write the index files to disk
       _indexCreator.setSegmentName(_segmentName);
       _indexCreator.seal();
-      System.out.println("=== CHECKPOINT B: AFTER _indexCreator.seal ===");
+      System.out.println("=== CHECKPOINT: After seal - Reading back indexed values ===");
+      inspectIndexedSegment(_tempIndexDir);
     } finally {
       _indexCreator.close();
-      System.out.println("=== CHECKPOINT C: AFTER _indexCreator.close ===");
     }
     LOGGER.info("Finished segment seal!");
 
@@ -521,22 +521,27 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     // Delete the temporary directory
     FileUtils.deleteQuietly(_tempIndexDir);
 
-    System.out.println("=== CHECKPOINT D: BEFORE convertFormatIfNecessary ===");
+    System.out.println("=== CHECKPOINT: After move - Reading back values ===");
+    inspectIndexedSegment(segmentOutputDir);
+
     convertFormatIfNecessary(segmentOutputDir);
-    System.out.println("=== CHECKPOINT E: AFTER convertFormatIfNecessary ===");
+
+    System.out.println("=== CHECKPOINT: After convertFormat - Reading back values ===");
+    inspectIndexedSegment(segmentOutputDir);
 
     if (_totalDocs > 0) {
-      System.out.println("=== CHECKPOINT F: BEFORE buildStarTreeV2IfNecessary ===");
       buildStarTreeV2IfNecessary(segmentOutputDir);
-      System.out.println("=== CHECKPOINT G: AFTER buildStarTreeV2IfNecessary ===");
-      System.out.println("=== CHECKPOINT H: BEFORE buildMultiColumnTextIndex ===");
+      System.out.println("=== CHECKPOINT: After starTree - Reading back values ===");
+      inspectIndexedSegment(segmentOutputDir);
+
       buildMultiColumnTextIndex(segmentOutputDir);
-      System.out.println("=== CHECKPOINT I: AFTER buildMultiColumnTextIndex ===");
+      System.out.println("=== CHECKPOINT: After textIndex - Reading back values ===");
+      inspectIndexedSegment(segmentOutputDir);
     }
 
-    System.out.println("=== CHECKPOINT J: BEFORE updatePostSegmentCreationIndexes ===");
     updatePostSegmentCreationIndexes(segmentOutputDir);
-    System.out.println("=== CHECKPOINT K: AFTER updatePostSegmentCreationIndexes ===");
+    System.out.println("=== CHECKPOINT: After updateIndexes - Reading back values ===");
+    inspectIndexedSegment(segmentOutputDir);
 
     // Compute CRC and creation time
     long crc = CrcUtils.forAllFilesInFolder(segmentOutputDir).computeCrc();
@@ -559,7 +564,28 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     LOGGER.info("Driver, record read time (in ms) : {}", TimeUnit.NANOSECONDS.toMillis(_totalRecordReadTimeNs));
     LOGGER.info("Driver, stats collector time (in ms) : {}", TimeUnit.NANOSECONDS.toMillis(_totalStatsCollectorTimeNs));
     LOGGER.info("Driver, indexing time (in ms) : {}", TimeUnit.NANOSECONDS.toMillis(_totalIndexTimeNs));
-    System.out.println("=== EXITING handlePostCreation ===");
+  }
+
+  private void inspectIndexedSegment(File segmentDir) {
+    try {
+          IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_config.getTableConfig(), _dataSchema);
+          ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDir, indexLoadingConfig);
+          
+          DataSource dataSource = segment.getDataSource("jsonColumn1");
+          ForwardIndexReader reader = dataSource.getForwardIndex();
+          Dictionary dictionary = dataSource.getDictionary();
+          
+          System.out.println("  jsonColumn1 values:");
+          for (int i = 0; i < Math.min(7, segment.getSegmentMetadata().getTotalDocs()); i++) {
+              int dictId = reader.getDictId(i, null);
+              Object value = dictionary.get(dictId);
+              System.out.println("    Row " + i + ": dictId=" + dictId + ", value=" + value);
+          }
+          
+          segment.destroy();
+      } catch (Exception e) {
+          System.out.println("  Failed to inspect: " + e.getMessage());
+      }
   }
 
   private void buildMultiColumnTextIndex(File segmentOutputDir)

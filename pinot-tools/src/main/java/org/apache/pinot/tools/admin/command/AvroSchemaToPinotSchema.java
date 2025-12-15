@@ -22,7 +22,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -144,7 +144,7 @@ public class AvroSchemaToPinotSchema extends AbstractBaseAdminCommand implements
    * @return The column <-> fieldType map.
    */
   private Map<String, FieldSpec.FieldType> buildFieldTypesMap() {
-    Map<String, FieldSpec.FieldType> fieldTypes = new HashMap<>();
+    Map<String, FieldSpec.FieldType> fieldTypes = new LinkedHashMap<>();
     if (_dimensions != null) {
       for (String column : _dimensions.split("\\s*,\\s*")) {
         fieldTypes.put(column, FieldSpec.FieldType.DIMENSION);

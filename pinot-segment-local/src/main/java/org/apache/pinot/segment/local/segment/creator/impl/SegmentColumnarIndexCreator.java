@@ -320,40 +320,91 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     return ForwardIndexType.getDefaultCompressionType(fieldType);
   }
 
+  // @Override
+  // public void indexRow(GenericRow row)
+  //     throws IOException {
+  //   for (Map.Entry<String, Map<IndexType<?, ?, ?>, IndexCreator>> byColEntry : _creatorsByColAndIndex.entrySet()) {
+  //     String columnName = byColEntry.getKey();
+
+  //     Object columnValueToIndex = row.getValue(columnName);
+  //     if (columnValueToIndex == null) {
+  //       throw new RuntimeException("Null value for column:" + columnName);
+  //     }
+
+  //     Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex = byColEntry.getValue();
+
+  //     FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
+  //     SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
+  //     try {
+  //       if (fieldSpec.isSingleValueField()) {
+  //         indexSingleValueRow(dictionaryCreator, columnValueToIndex, creatorsByIndex);
+  //       } else {
+  //         indexMultiValueRow(dictionaryCreator, (Object[]) columnValueToIndex, creatorsByIndex);
+  //       }
+  //     } catch (JsonParseException jpe) {
+  //       throw new ColumnJsonParserException(columnName, jpe);
+  //     }
+  //   }
+
+  //   for (Map.Entry<String, NullValueVectorCreator> entry : _nullValueVectorCreatorMap.entrySet()) {
+  //     // If row has null value for given column name, add to null value vector
+  //     if (row.isNullValue(entry.getKey())) {
+  //       entry.getValue().setNull(_docIdCounter);
+  //     }
+  //   }
+
+  //   _docIdCounter++;
+  // }
+
   @Override
-  public void indexRow(GenericRow row)
-      throws IOException {
-    for (Map.Entry<String, Map<IndexType<?, ?, ?>, IndexCreator>> byColEntry : _creatorsByColAndIndex.entrySet()) {
-      String columnName = byColEntry.getKey();
+  public void indexRow(GenericRow row) throws IOException {
+      for (Map.Entry<String, Map<IndexType<?, ?, ?>, IndexCreator>> byColEntry : _creatorsByColAndIndex.entrySet()) {
+          String columnName = byColEntry.getKey();
 
-      Object columnValueToIndex = row.getValue(columnName);
-      if (columnValueToIndex == null) {
-        throw new RuntimeException("Null value for column:" + columnName);
+          Object columnValueToIndex = row.getValue(columnName);
+          if (columnValueToIndex == null) {
+              throw new RuntimeException("Null value for column:" + columnName);
+          }
+
+          // DEBUG for jsonColumn1
+          if ("jsonColumn1".equals(columnName)) {
+              System.out.println("indexRow() - columnName: " + columnName);
+              System.out.println("  columnValueToIndex: " + columnValueToIndex + 
+                              " (identity: " + System.identityHashCode(columnValueToIndex) + 
+                              ", class: " + columnValueToIndex.getClass().getName() + ")");
+          }
+
+          Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex = byColEntry.getValue();
+
+          FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
+          SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
+          
+          try {
+              if (fieldSpec.isSingleValueField()) {
+                  // DEBUG: See what dict ID is assigned BEFORE calling indexSingleValueRow
+                  if ("jsonColumn1".equals(columnName) && dictionaryCreator != null) {
+                      int dictId = dictionaryCreator.indexOfSV(columnValueToIndex);
+                      System.out.println("  Dictionary lookup returned dictId: " + dictId);
+                      System.out.println("  About to index docId: " + _docIdCounter);
+                  }
+                  
+                  indexSingleValueRow(dictionaryCreator, columnValueToIndex, creatorsByIndex);
+              } else {
+                  indexMultiValueRow(dictionaryCreator, (Object[]) columnValueToIndex, creatorsByIndex);
+              }
+          } catch (JsonParseException jpe) {
+              throw new ColumnJsonParserException(columnName, jpe);
+          }
       }
 
-      Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex = byColEntry.getValue();
-
-      FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
-      SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
-      try {
-        if (fieldSpec.isSingleValueField()) {
-          indexSingleValueRow(dictionaryCreator, columnValueToIndex, creatorsByIndex);
-        } else {
-          indexMultiValueRow(dictionaryCreator, (Object[]) columnValueToIndex, creatorsByIndex);
-        }
-      } catch (JsonParseException jpe) {
-        throw new ColumnJsonParserException(columnName, jpe);
+      for (Map.Entry<String, NullValueVectorCreator> entry : _nullValueVectorCreatorMap.entrySet()) {
+          // If row has null value for given column name, add to null value vector
+          if (row.isNullValue(entry.getKey())) {
+              entry.getValue().setNull(_docIdCounter);
+          }
       }
-    }
 
-    for (Map.Entry<String, NullValueVectorCreator> entry : _nullValueVectorCreatorMap.entrySet()) {
-      // If row has null value for given column name, add to null value vector
-      if (row.isNullValue(entry.getKey())) {
-        entry.getValue().setNull(_docIdCounter);
-      }
-    }
-
-    _docIdCounter++;
+      _docIdCounter++;
   }
 
   /**
