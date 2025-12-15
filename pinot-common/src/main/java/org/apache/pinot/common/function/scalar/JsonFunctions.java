@@ -249,7 +249,7 @@ public class JsonFunctions {
 
   @ScalarFunction
   public static Object jsonKeyValueArrayToMap(Object keyValueArray, String keyColumnName, String valueColumnName) {
-    Map<String, String> result = new java.util.LinkedHashMap<>();
+    Map<String, String> result = new java.util.HashMap<>();
     if (keyValueArray instanceof Object[]) {
       Object[] array = (Object[]) keyValueArray;
       for (Object obj : array) {

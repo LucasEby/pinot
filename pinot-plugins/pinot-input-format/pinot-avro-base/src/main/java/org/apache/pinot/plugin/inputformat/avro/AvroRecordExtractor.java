@@ -57,55 +57,37 @@ public class AvroRecordExtractor extends BaseRecordExtractor<GenericRecord> {
 
   @Override
   public GenericRow extract(GenericRecord from, GenericRow to) {
-      // System.out.println("AvroRecordExtractor EXTRACT CALLED");
-      if (_extractAll) {
-          List<Schema.Field> fields = from.getSchema().getFields();
-          for (Schema.Field field : fields) {
-              String fieldName = field.name();
-              Object value = from.get(fieldName);
-              if (_applyLogicalTypes) {
-                  value = AvroSchemaUtil.applyLogicalType(field, value);
-              }
-              if (value != null) {
-                  value = transformValue(value, field);
-              }
-              to.putValue(fieldName, value);
-              
-              // if ("jsonColumn1".equals(fieldName)) {
-              //     System.err.println("AFTER EXTRACTION in IF - Field: " + fieldName + 
-              //         ", Value: " + value + 
-              //         ", Value Class: " + (value != null ? value.getClass().getName() : "null") +
-              //         ", Value Identity: " + System.identityHashCode(value));
-              // }
-          }
-      } else {
-          for (String fieldName : _fields) {
-              Schema.Field field = from.getSchema().getField(fieldName);
-              Object value = field == null ? null : from.get(field.pos());
-              if (_applyLogicalTypes) {
-                  value = AvroSchemaUtil.applyLogicalType(field, value);
-              }
-              if (value != null) {
-                  value = transformValue(value, field);
-              }
-              to.putValue(fieldName, value);
-              // System.out.println("AVRO RECORD EXTRACTOR ELSE");
-              
-              // if ("jsonColumn1".equals(fieldName)) {
-              //     System.err.println("AFTER EXTRACTION in ELSE - Field: " + fieldName + 
-              //         ", Value: " + value + 
-              //         ", Value Class: " + (value != null ? value.getClass().getName() : "null") +
-              //         ", Value Identity: " + System.identityHashCode(value));
-              // }
-          }
+    if (_extractAll) {
+      List<Schema.Field> fields = from.getSchema().getFields();
+      for (Schema.Field field : fields) {
+        String fieldName = field.name();
+        Object value = from.get(fieldName);
+        if (_applyLogicalTypes) {
+          value = AvroSchemaUtil.applyLogicalType(field, value);
+        }
+        if (value != null) {
+          value = transformValue(value, field);
+        }
+        to.putValue(fieldName, value);
       }
-      // System.out.println("END OF AVRO RECORD EXTRACTOR");
-      return to;
+    } else {
+      for (String fieldName : _fields) {
+        Schema.Field field = from.getSchema().getField(fieldName);
+        Object value = field == null ? null : from.get(field.pos());
+        if (_applyLogicalTypes) {
+          value = AvroSchemaUtil.applyLogicalType(field, value);
+        }
+        if (value != null) {
+          value = transformValue(value, field);
+        }
+        to.putValue(fieldName, value);
+      }
+    }
+    return to;
   }
 
   protected Object transformValue(Object value, Schema.Field field) {
-      // System.out.println("value object is GenericData Array contains values object which has a HashMap at 1");
-      return convert(value);
+    return convert(value);
   }
 
   /**
@@ -126,19 +108,12 @@ public class AvroRecordExtractor extends BaseRecordExtractor<GenericRecord> {
   protected Map<Object, Object> convertRecord(Object value) {
     GenericRecord record = (GenericRecord) value;
     List<Schema.Field> fields = record.getSchema().getFields();
-    Map<Object, Object> convertedMap = Maps.newLinkedHashMapWithExpectedSize(fields.size());
+    Map<Object, Object> convertedMap = Maps.newHashMapWithExpectedSize(fields.size());
     for (Schema.Field field : fields) {
       String fieldName = field.name();
       Object fieldValue = record.get(fieldName);
       Object convertedValue = fieldValue != null ? transformValue(fieldValue, field) : null;
-      // convertedMap.put(fieldName, convertedValue);
-      convertedMap.put(new String(fieldName), convertedValue);
-      if ("jsonColumn1".equals(fieldName)) {
-          System.err.println("convertRecord - Field: " + fieldName + 
-              ", Value: " + convertedValue + 
-              ", Value Class: " + (convertedValue != null ? convertedValue.getClass().getName() : "null") +
-              ", Value Identity: " + System.identityHashCode(convertedValue));
-      }
+      convertedMap.put(fieldName, convertedValue);
     }
     return convertedMap;
   }
