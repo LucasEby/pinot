@@ -34,6 +34,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.avro.Schema;
+import org.apache.avro.Schema.Field;
+import org.apache.avro.Schema.Type;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
@@ -98,7 +100,7 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
 
-  private static final ObjectMapper MAPPER = new ObjectMapper();
+  private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
 
   @Override
   protected String getFilter() {
@@ -272,26 +274,22 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
     ImmutableSegment segment =
         ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
     _indexSegment = segment;
-    _indexSegments = List.of(segment); //, segment);
+    _indexSegments = List.of(segment, segment);
   }
 
   /**
-     * Compares JSON objects as unordered sets of key-value pairs
-     */
-    private void assertJsonEqualsIgnoringOrder(String expectedJson, String actualJson) {
-        try {
-            JsonNode expected = MAPPER.readTree(expectedJson);
-            JsonNode actual = MAPPER.readTree(actualJson);
-            
-            // JsonNode.equals() ignores field order for objects
-            // but maintains order for arrays
-            Assert.assertTrue(expected.equals(actual), 
-              "JSON did not match ignoring field order.\nExpected: " + expectedJson + "\nActual: " + actualJson);
-                
-        } catch (Exception e) {
-            Assert.fail("Failed to parse JSON: " + e.getMessage(), e);
-        }
+   * Compares two JSON strings structurally, ignoring object key ordering.
+   */
+  private void assertJsonEquals(String expected, String actual) {
+    try {
+      JsonNode expectedNode = JSON_MAPPER.readTree(expected);
+      JsonNode actualNode = JSON_MAPPER.readTree(actual);
+      Assert.assertTrue(expectedNode.equals(actualNode),
+          "JSON mismatch.\nExpected: " + expected + "\nActual: " + actual);
+    } catch (Exception e) {
+      Assert.fail("Failed to parse JSON: " + e.getMessage());
     }
+  }
 
   /** Verify that we can query the JSON column that ingested ComplexType data from an AVRO file (see setUp). */
   @Test
@@ -299,40 +297,33 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
     Operator<SelectionResultsBlock> operator =
         getOperator("select intColumn, stringColumn, jsonColumn1, jsonColumn2 FROM " + "testTable limit 100");
     SelectionResultsBlock block = operator.nextBlock();
-    List<Object[]> rows = new ArrayList<>(block.getRows());
-
+    Collection<Object[]> rows = block.getRows();
     Assert.assertEquals(block.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.INT);
     Assert.assertEquals(block.getDataSchema().getColumnDataType(1), DataSchema.ColumnDataType.STRING);
     Assert.assertEquals(block.getDataSchema().getColumnDataType(2), DataSchema.ColumnDataType.JSON);
 
-    List<Object[]> expectedRows = new ArrayList<>();
-    expectedRows.add(new Object[]{1, "daffy duck", "[\"this\",\"is\",\"a\",\"test\"]", "\"UP\""});
-    expectedRows.add(new Object[]{2, "mickey mouse", "{\"a\":\"1\",\"b\":\"2\"}", "\"DOWN\""});
-    expectedRows.add(new Object[]{3, "donald duck", "{\"a\":\"1\",\"b\":\"2\"}", "\"UP\""});
-    expectedRows.add(new Object[]{4, "scrooge mcduck", "{\"a\":\"1\",\"b\":\"2\"}", "\"LEFT\""});
-    expectedRows.add(new Object[]{5, "minney mouse", "{\"name\":\"minney\",\"id\":1}", "\"RIGHT\""});
-    expectedRows.add(new Object[]{6, "pluto", "\"test\"", "\"DOWN\""});
-    expectedRows.add(new Object[]{7, "scooby doo", "{\"name\":\"scooby\",\"id\":7}", "\"UP\""});
+    // Expected values for each column
+    Object[][] expecteds = {
+        {1, "daffy duck", "[\"this\",\"is\",\"a\",\"test\"]", "\"UP\""},
+        {2, "mickey mouse", "{\"a\":\"1\",\"b\":\"2\"}", "\"DOWN\""},
+        {3, "donald duck", "{\"a\":\"1\",\"b\":\"2\"}", "\"UP\""},
+        {4, "scrooge mcduck", "{\"a\":\"1\",\"b\":\"2\"}", "\"LEFT\""},
+        {5, "minney mouse", "{\"name\":\"minney\",\"id\":1}", "\"RIGHT\""},
+        {6, "pluto", "\"test\"", "\"DOWN\""},
+        {7, "scooby doo", "{\"name\":\"scooby\",\"id\":7}", "\"UP\""}
+    };
 
     int index = 0;
     for (Object[] row : rows) {
-      Object[] expected = expectedRows.get(index++);
-
-      // int and string columns: regular equality
-      Assert.assertEquals(row[0], expected[0]);
-      Assert.assertEquals(row[1], expected[1]);
-
-      // JSON column: compare structurally, ignoring object field order
-      String actualJson = row[2].toString();
-      String expectedJson = (String) expected[2];
-      System.out.println("actualJson:");
-      System.out.println(actualJson);
-      System.out.println("expectedJson:");
-      System.out.println(expectedJson);
-      assertJsonEqualsIgnoringOrder(expectedJson, actualJson);
-
-      // jsonColumn2 is just a STRING in this test data
-      Assert.assertEquals(row[3], expected[3]);
+      Object[] expected = expecteds[index++];
+      
+      // Compare non-JSON columns with regular equality
+      Assert.assertEquals(row[0], expected[0]); // intColumn
+      Assert.assertEquals(row[1], expected[1]); // stringColumn
+      Assert.assertEquals(row[3], expected[3]); // jsonColumn2 (just a string)
+      
+      // Compare JSON column structurally
+      assertJsonEquals((String) expected[2], row[2].toString());
     }
   }
 
