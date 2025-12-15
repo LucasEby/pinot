@@ -361,12 +361,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
    * @param jsonString The JSON string to find an equivalent for
    * @return A matching string from the dictionary, or null if no match found
    */
-  private String tryNormalizeJson(String jsonString) {
-    // Only attempt normalization if it looks like JSON
-    if (!looksLikeJson(jsonString)) {
-      return null;
-    }
-      
+  private String tryNormalizeJson(String jsonString) {      
     try {
       JsonNode inputJson = JSON_MAPPER.readTree(jsonString);
       
