@@ -19,7 +19,7 @@
 package org.apache.pinot.segment.spi.creator;
 
 import com.google.common.base.Preconditions;
-import java.util.LinkedHashMap;
+import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -52,7 +52,7 @@ public class StatsCollectorConfig {
     _tableConfig = tableConfig;
     _schema = schema;
     _segmentPartitionConfig = segmentPartitionConfig;
-    _columnFieldConfigMap = new LinkedHashMap<>();
+    _columnFieldConfigMap = new HashMap<>();
     if (tableConfig.getFieldConfigList() != null) {
       for (FieldConfig fieldConfig : tableConfig.getFieldConfigList()) {
         _columnFieldConfigMap.put(fieldConfig.getName(), fieldConfig);

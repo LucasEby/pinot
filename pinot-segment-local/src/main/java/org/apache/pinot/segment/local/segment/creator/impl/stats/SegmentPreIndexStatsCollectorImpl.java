@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl.stats;
 
-import java.util.LinkedHashMap;
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.segment.local.utils.ClusterConfigForTable;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
@@ -47,7 +47,7 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
 
   @Override
   public void init() {
-    _columnStatsCollectorMap = new LinkedHashMap<>();
+    _columnStatsCollectorMap = new HashMap<>();
     Map<String, FieldIndexConfigs> indexConfigsByCol = FieldIndexConfigsUtil.createIndexConfigsByColName(
         _statsCollectorConfig.getTableConfig(), _statsCollectorConfig.getSchema());
 
