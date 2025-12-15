@@ -23,7 +23,6 @@ import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -347,12 +346,6 @@ public class WorkerManager {
     } else {
       candidateServers = getCandidateServersPerTables(context);
     }
-
-    // Sort candidate servers to ensure deterministic worker assignment order
-    // The set iteration order is non-deterministic, so we must sort before assigning worker IDs
-    candidateServers.sort(Comparator.comparing(QueryServerInstance::getHostname)
-        .thenComparingInt(QueryServerInstance::getQueryServicePort)
-        .thenComparingInt(QueryServerInstance::getQueryMailboxPort));
     return candidateServers;
   }
 
@@ -496,13 +489,7 @@ public class WorkerManager {
     int workerId = 0;
     Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = new HashMap<>();
     Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap = new HashMap<>();
-
-    // Sort entries by ServerInstance to ensure deterministic worker ID assignment
-    List<Map.Entry<ServerInstance, Map<String, List<String>>>> sortedEntries = 
-        new ArrayList<>(serverInstanceToSegmentsMap.entrySet());
-    sortedEntries.sort(Comparator.comparing(e -> e.getKey().getInstanceId()));
-
-    for (Map.Entry<ServerInstance, Map<String, List<String>>> entry : sortedEntries) {
+    for (Map.Entry<ServerInstance, Map<String, List<String>>> entry : serverInstanceToSegmentsMap.entrySet()) {
       workerIdToServerInstanceMap.put(workerId, new QueryServerInstance(entry.getKey()));
       workerIdToSegmentsMap.put(workerId, entry.getValue());
       workerId++;
@@ -657,12 +644,8 @@ public class WorkerManager {
     int workerId = 0;
     Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = new HashMap<>();
     Map<Integer, Map<String, List<String>>> workerIdToLogicalTableSegmentsMap = new HashMap<>();
-    // Sort entries by ServerInstance to ensure deterministic worker ID assignment
-    List<Map.Entry<ServerInstance, Map<String, List<String>>>> sortedEntries =
-        new ArrayList<>(serverInstanceToLogicalSegmentsMap.entrySet());
-    sortedEntries.sort(Comparator.comparing(e -> e.getKey().getInstanceId()));
-    
-    for (Map.Entry<ServerInstance, Map<String, List<String>>> entry : sortedEntries) {
+    for (Map.Entry<ServerInstance, Map<String, List<String>>> entry
+        : serverInstanceToLogicalSegmentsMap.entrySet()) {
       workerIdToServerInstanceMap.put(workerId, new QueryServerInstance(entry.getKey()));
       workerIdToLogicalTableSegmentsMap.put(workerId, entry.getValue());
       workerId++;

@@ -1213,7 +1213,6 @@ public class MutableSegmentImpl implements MutableSegment {
     try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
       recordReader.init(this);
       recordReader.getRecord(docId, reuse);
-      System.out.println("docId: " + docId + " Reuse: " + reuse);
       return reuse;
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while reading record for docId: " + docId, e);
