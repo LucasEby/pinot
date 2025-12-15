@@ -134,7 +134,6 @@ public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Objec
 
   @Override
   public GenericRow extract(Map<String, Object> from, GenericRow to) {
-    System.out.println("CLPLogRecordExtractor EXTRACT CALLED");
     Set<String> clpEncodedFieldNames = _config.getFieldsForClpEncoding();
 
     // Preserve topic name if configured, regardless of _extractAll

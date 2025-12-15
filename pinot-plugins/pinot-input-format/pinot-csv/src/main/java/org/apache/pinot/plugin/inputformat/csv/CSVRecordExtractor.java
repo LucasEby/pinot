@@ -48,7 +48,6 @@ public class CSVRecordExtractor extends BaseRecordExtractor<CSVRecord> {
 
   @Override
   public GenericRow extract(CSVRecord from, GenericRow to) {
-    System.out.println("CSVRecordExtractor EXTRACT CALLED");
     for (String fieldName : _fields) {
       String value = from.isSet(fieldName) ? from.get(fieldName) : null;
       to.putValue(fieldName, convert(value));

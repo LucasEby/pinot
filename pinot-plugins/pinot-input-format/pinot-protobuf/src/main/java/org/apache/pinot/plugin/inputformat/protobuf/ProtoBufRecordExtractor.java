@@ -67,7 +67,6 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
 
   @Override
   public GenericRow extract(Message from, GenericRow to) {
-    System.out.println("ProtoBufRecordExtractor EXTRACT CALLED");
     Descriptors.Descriptor descriptor = from.getDescriptorForType();
     if (_extractAll) {
       for (Descriptors.FieldDescriptor fieldDescriptor : descriptor.getFields()) {

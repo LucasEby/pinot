@@ -148,7 +148,6 @@ public class AvroSchemaUtil {
     for (String string : strings) {
       jsonArray.add(string);
     }
-    System.out.println("convertStringsToJsonArray: " + jsonArray);
     return jsonArray;
   }
 
@@ -164,7 +163,6 @@ public class AvroSchemaUtil {
    */
   public static Object applyLogicalType(Schema.Field field, Object value) {
     if (field == null || field.schema() == null) {
-      System.out.println("Schema Field was null or field was null");
       return value;
     }
 
@@ -228,14 +226,12 @@ public class AvroSchemaUtil {
       return null;
     }
     for (Map.Entry<String, Object> entry : map.entrySet()) {
-      System.out.println("entry.getValue: " + entry.getValue());
       entry.setValue(processElement(entry.getValue(), valueSchema));
     }
     return map;
   }
 
   private static Object processElement(Object element, Schema schema) {
-    System.out.println("Process Element called");
     if (element instanceof GenericRecord) {
       return convertLogicalType((GenericRecord) element);
     } else {

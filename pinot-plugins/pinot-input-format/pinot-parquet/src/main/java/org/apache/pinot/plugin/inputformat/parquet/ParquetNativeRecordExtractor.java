@@ -97,7 +97,6 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
 
   @Override
   public GenericRow extract(Group from, GenericRow to) {
-    System.out.println("ParquetNativeRecordExtractor EXTRACT CALLED");
     GroupType fromType = from.getType();
     if (_extractAll) {
       List<Type> fields = fromType.getFields();
