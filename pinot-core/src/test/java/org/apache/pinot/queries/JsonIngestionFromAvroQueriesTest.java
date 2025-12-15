@@ -318,9 +318,9 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
       Object[] expected = expecteds[index++];
       
       // Compare non-JSON columns with regular equality
-      Assert.assertEquals(row[0], expected[0]); // intColumn
-      Assert.assertEquals(row[1], expected[1]); // stringColumn
-      Assert.assertEquals(row[3], expected[3]); // jsonColumn2 (just a string)
+      Assert.assertEquals(row[0], expected[0]);
+      Assert.assertEquals(row[1], expected[1]);
+      Assert.assertEquals(row[3], expected[3]);
       
       // Compare JSON column structurally
       assertJsonEquals((String) expected[2], row[2].toString());
@@ -398,10 +398,8 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
         "[[{\"data\":{\"a\":\"7\",\"b\":\"14\"},\"timestamp\":1719390727}]]");
 
     int index = 0;
-    Iterator<Object[]> iterator = rows.iterator();
-    while (iterator.hasNext()) {
-      Object[] row = iterator.next();
-      Assert.assertEquals(Arrays.toString(row), expecteds.get(index++));
+    for (Object[] row : rows) {
+      assertJsonEquals(expecteds.get(index++), row[0].toString());
     }
   }
 
