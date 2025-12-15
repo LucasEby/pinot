@@ -26,7 +26,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -94,14 +94,14 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   static final int METADATA_PROPERTY_LENGTH_LIMIT = 512;
   private SegmentGeneratorConfig _config;
   private TreeMap<String, ColumnIndexCreationInfo> _indexCreationInfoMap;
-  private final Map<String, SegmentDictionaryCreator> _dictionaryCreatorMap = new LinkedHashMap<>();
+  private final Map<String, SegmentDictionaryCreator> _dictionaryCreatorMap = new HashMap<>();
   /**
    * Contains, indexed by column name, the creator associated with each index type.
    *
    * Indexes whose build lifecycle is not DURING_SEGMENT_CREATION are not included here.
    */
-  private Map<String, Map<IndexType<?, ?, ?>, IndexCreator>> _creatorsByColAndIndex = new LinkedHashMap<>();
-  private final Map<String, NullValueVectorCreator> _nullValueVectorCreatorMap = new LinkedHashMap<>();
+  private Map<String, Map<IndexType<?, ?, ?>, IndexCreator>> _creatorsByColAndIndex = new HashMap<>();
+  private final Map<String, NullValueVectorCreator> _nullValueVectorCreatorMap = new HashMap<>();
   private String _segmentName;
   private Schema _schema;
   private File _indexDir;
@@ -131,7 +131,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
     Map<String, FieldIndexConfigs> indexConfigs = segmentCreationSpec.getIndexConfigsByColName();
 
-    _creatorsByColAndIndex = Maps.newLinkedHashMapWithExpectedSize(indexConfigs.keySet().size());
+    _creatorsByColAndIndex = Maps.newHashMapWithExpectedSize(indexConfigs.keySet().size());
 
     for (String columnName : indexConfigs.keySet()) {
       FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
@@ -209,7 +209,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       }
 
       Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex =
-          Maps.newLinkedHashMapWithExpectedSize(IndexService.getInstance().getAllIndexes().size());
+          Maps.newHashMapWithExpectedSize(IndexService.getInstance().getAllIndexes().size());
       for (IndexType<?, ?, ?> index : IndexService.getInstance().getAllIndexes()) {
         if (index.getIndexBuildLifecycle() != IndexType.BuildLifecycle.DURING_SEGMENT_CREATION) {
           continue;
@@ -320,91 +320,40 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     return ForwardIndexType.getDefaultCompressionType(fieldType);
   }
 
-  // @Override
-  // public void indexRow(GenericRow row)
-  //     throws IOException {
-  //   for (Map.Entry<String, Map<IndexType<?, ?, ?>, IndexCreator>> byColEntry : _creatorsByColAndIndex.entrySet()) {
-  //     String columnName = byColEntry.getKey();
-
-  //     Object columnValueToIndex = row.getValue(columnName);
-  //     if (columnValueToIndex == null) {
-  //       throw new RuntimeException("Null value for column:" + columnName);
-  //     }
-
-  //     Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex = byColEntry.getValue();
-
-  //     FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
-  //     SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
-  //     try {
-  //       if (fieldSpec.isSingleValueField()) {
-  //         indexSingleValueRow(dictionaryCreator, columnValueToIndex, creatorsByIndex);
-  //       } else {
-  //         indexMultiValueRow(dictionaryCreator, (Object[]) columnValueToIndex, creatorsByIndex);
-  //       }
-  //     } catch (JsonParseException jpe) {
-  //       throw new ColumnJsonParserException(columnName, jpe);
-  //     }
-  //   }
-
-  //   for (Map.Entry<String, NullValueVectorCreator> entry : _nullValueVectorCreatorMap.entrySet()) {
-  //     // If row has null value for given column name, add to null value vector
-  //     if (row.isNullValue(entry.getKey())) {
-  //       entry.getValue().setNull(_docIdCounter);
-  //     }
-  //   }
-
-  //   _docIdCounter++;
-  // }
-
   @Override
-  public void indexRow(GenericRow row) throws IOException {
-      for (Map.Entry<String, Map<IndexType<?, ?, ?>, IndexCreator>> byColEntry : _creatorsByColAndIndex.entrySet()) {
-          String columnName = byColEntry.getKey();
+  public void indexRow(GenericRow row)
+      throws IOException {
+    for (Map.Entry<String, Map<IndexType<?, ?, ?>, IndexCreator>> byColEntry : _creatorsByColAndIndex.entrySet()) {
+      String columnName = byColEntry.getKey();
 
-          Object columnValueToIndex = row.getValue(columnName);
-          if (columnValueToIndex == null) {
-              throw new RuntimeException("Null value for column:" + columnName);
-          }
-
-          // DEBUG for jsonColumn1
-          if ("jsonColumn1".equals(columnName)) {
-              System.out.println("indexRow() - columnName: " + columnName);
-              System.out.println("  columnValueToIndex: " + columnValueToIndex + 
-                              " (identity: " + System.identityHashCode(columnValueToIndex) + 
-                              ", class: " + columnValueToIndex.getClass().getName() + ")");
-          }
-
-          Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex = byColEntry.getValue();
-
-          FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
-          SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
-          
-          try {
-              if (fieldSpec.isSingleValueField()) {
-                  // DEBUG: See what dict ID is assigned BEFORE calling indexSingleValueRow
-                  if ("jsonColumn1".equals(columnName) && dictionaryCreator != null) {
-                      int dictId = dictionaryCreator.indexOfSV(columnValueToIndex);
-                      System.out.println("  Dictionary lookup returned dictId: " + dictId);
-                      System.out.println("  About to index docId: " + _docIdCounter);
-                  }
-                  
-                  indexSingleValueRow(dictionaryCreator, columnValueToIndex, creatorsByIndex);
-              } else {
-                  indexMultiValueRow(dictionaryCreator, (Object[]) columnValueToIndex, creatorsByIndex);
-              }
-          } catch (JsonParseException jpe) {
-              throw new ColumnJsonParserException(columnName, jpe);
-          }
+      Object columnValueToIndex = row.getValue(columnName);
+      if (columnValueToIndex == null) {
+        throw new RuntimeException("Null value for column:" + columnName);
       }
 
-      for (Map.Entry<String, NullValueVectorCreator> entry : _nullValueVectorCreatorMap.entrySet()) {
-          // If row has null value for given column name, add to null value vector
-          if (row.isNullValue(entry.getKey())) {
-              entry.getValue().setNull(_docIdCounter);
-          }
-      }
+      Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex = byColEntry.getValue();
 
-      _docIdCounter++;
+      FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
+      SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
+      try {
+        if (fieldSpec.isSingleValueField()) {
+          indexSingleValueRow(dictionaryCreator, columnValueToIndex, creatorsByIndex);
+        } else {
+          indexMultiValueRow(dictionaryCreator, (Object[]) columnValueToIndex, creatorsByIndex);
+        }
+      } catch (JsonParseException jpe) {
+        throw new ColumnJsonParserException(columnName, jpe);
+      }
+    }
+
+    for (Map.Entry<String, NullValueVectorCreator> entry : _nullValueVectorCreatorMap.entrySet()) {
+      // If row has null value for given column name, add to null value vector
+      if (row.isNullValue(entry.getKey())) {
+        entry.getValue().setNull(_docIdCounter);
+      }
+    }
+
+    _docIdCounter++;
   }
 
   /**

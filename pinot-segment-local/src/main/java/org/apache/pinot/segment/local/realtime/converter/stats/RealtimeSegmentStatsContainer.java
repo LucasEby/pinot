@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.segment.local.realtime.converter.stats;
 
-import java.util.LinkedHashMap;
+import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.MapColumnPreIndexStatsCollector;
@@ -41,7 +41,7 @@ import org.roaringbitmap.PeekableIntIterator;
  */
 public class RealtimeSegmentStatsContainer implements SegmentPreIndexStatsContainer {
   private final MutableSegment _mutableSegment;
-  private final Map<String, ColumnStatistics> _columnStatisticsMap = new LinkedHashMap<>();
+  private final Map<String, ColumnStatistics> _columnStatisticsMap = new HashMap<>();
   private final int _totalDocCount;
 
   @Deprecated
