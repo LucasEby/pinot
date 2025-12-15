@@ -47,7 +47,6 @@ public class PinotSegmentToAvroConverter implements PinotSegmentConverter {
   @Override
   public void convert()
       throws Exception {
-    System.out.println("PinotSegmentToAvroConverter Called");
     File indexDir = new File(_segmentDir);
     Schema avroSchema = AvroUtils.getAvroSchemaFromPinotSchema(new SegmentMetadataImpl(indexDir).getSchema());
     try (PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader(new File(_segmentDir))) {

@@ -25,7 +25,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.LinkedHashMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -307,7 +307,7 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
   }
 
   private Map<String, String> getSegmentNameGeneratorConfig(String type, Map<String, String> additionalConfigs) {
-    Map<String, String> segmentNameGeneratorConfig = new LinkedHashMap<>(additionalConfigs);
+    Map<String, String> segmentNameGeneratorConfig = new HashMap<>(additionalConfigs);
     if ((BatchConfigProperties.SegmentNameGeneratorType.FIXED.equalsIgnoreCase(type)) && (!segmentNameGeneratorConfig
         .containsKey(SEGMENT_NAME))) {
       segmentNameGeneratorConfig
@@ -325,7 +325,7 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
   }
 
   private Map<String, String> getPinotFSConfigs(String scheme, Map<String, String> additionalConfigs) {
-    Map<String, String> fsConfigs = new LinkedHashMap<>();
+    Map<String, String> fsConfigs = new HashMap<>();
     fsConfigs.putAll(IngestionConfigUtils.getConfigMapWithPrefix(additionalConfigs, String.format("fs.%s.", scheme)));
     switch (scheme) {
       case "s3":
@@ -362,7 +362,7 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
     if (additionalConfigs == null) {
       return Collections.emptyMap();
     }
-    Map<String, String> recordReaderConfigs = new LinkedHashMap<>();
+    Map<String, String> recordReaderConfigs = new HashMap<>();
     for (String kvPair : additionalConfigs) {
       String[] splits = kvPair.split("=", 2);
       if ((splits.length == 2) && (splits[0] != null) && (splits[1] != null)) {

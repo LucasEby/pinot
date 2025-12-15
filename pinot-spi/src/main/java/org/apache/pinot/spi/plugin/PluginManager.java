@@ -33,7 +33,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -61,7 +61,7 @@ public class PluginManager {
   private static final String PINOUT_PLUGIN_PROPERTIES_FILE_NAME = "pinot-plugin.properties";
 
   // For backward compatibility, this map holds a mapping from old plugins class name to its new class name.
-  private static final Map<String, String> PLUGINS_BACKWARD_COMPATIBLE_CLASS_NAME_MAP = new LinkedHashMap<String, String>() {
+  private static final Map<String, String> PLUGINS_BACKWARD_COMPATIBLE_CLASS_NAME_MAP = new HashMap<String, String>() {
     {
       // MessageDecoder
       put("org.apache.pinot.core.realtime.stream.SimpleAvroMessageDecoder",
@@ -103,7 +103,7 @@ public class PluginManager {
   };
 
   private static final Map<String, String> INPUT_FORMAT_TO_RECORD_READER_CLASS_NAME_MAP =
-      new LinkedHashMap<String, String>() {
+      new HashMap<String, String>() {
         {
           put("avro", "org.apache.pinot.plugin.inputformat.avro.AvroRecordReader");
           put("csv", "org.apache.pinot.plugin.inputformat.csv.CSVRecordReader");
@@ -116,7 +116,7 @@ public class PluginManager {
       };
 
   private static final Map<String, String> INPUT_FORMAT_TO_RECORD_READER_CONFIG_CLASS_NAME_MAP =
-      new LinkedHashMap<String, String>() {
+      new HashMap<String, String>() {
         {
           put("avro", "org.apache.pinot.plugin.inputformat.avro.AvroRecordReaderConfig");
           put("csv", "org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig");
@@ -134,7 +134,7 @@ public class PluginManager {
 
   PluginManager() {
     // For the shaded plugins
-    _registry = new LinkedHashMap<>();
+    _registry = new HashMap<>();
     _registry.put(new Plugin(DEFAULT_PLUGIN_NAME), createClassLoader(Collections.emptyList()));
 
     // for the new pinot plugins
@@ -176,7 +176,7 @@ public class PluginManager {
           + "additional plugins.", PLUGINS_DIR_PROPERTY_NAME);
     } else {
       try {
-        LinkedHashMap<String, File> plugins = getPluginsToLoad(pluginsDirectories, pluginsInclude);
+        HashMap<String, File> plugins = getPluginsToLoad(pluginsDirectories, pluginsInclude);
         LOGGER.info("#getPluginsToLoad has produced {} plugins to load", plugins.size());
 
         for (Map.Entry<String, File> entry : plugins.entrySet()) {
@@ -207,12 +207,12 @@ public class PluginManager {
    * @return A hash map with key = plugin name, value = file object
    */
   @VisibleForTesting
-  public LinkedHashMap<String, File> getPluginsToLoad(String pluginsDirectories, String pluginsInclude)
+  public HashMap<String, File> getPluginsToLoad(String pluginsDirectories, String pluginsInclude)
       throws IllegalArgumentException {
     String[] directories = pluginsDirectories.split(";");
     LOGGER.info("Plugin directories: {}, parsed directories to load: '{}'", pluginsDirectories, directories);
 
-    LinkedHashMap<String, File> finalPluginsToLoad = new LinkedHashMap<>();
+    HashMap<String, File> finalPluginsToLoad = new HashMap<>();
 
     for (String pluginsDirectory : directories) {
       if (!new File(pluginsDirectory).exists()) {
