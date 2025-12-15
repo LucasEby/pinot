@@ -69,6 +69,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
   private Double2IntOpenHashMap _doubleValueToIndexMap;
   private Object2IntOpenHashMap<Object> _objectValueToIndexMap;
   private int _numBytesPerEntry = 0;
+  private static final int NOT_FOUND = -1;
 
   public SegmentDictionaryCreator(String columnName, DataType storedType, File indexFile,
       boolean useVarLengthDictionary) {
@@ -111,6 +112,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
         int numValues = sortedInts.length;
         Preconditions.checkState(numValues > 0);
         _intValueToIndexMap = new Int2IntOpenHashMap(numValues);
+        _intValueToIndexMap.defaultReturnValue(NOT_FOUND);
 
         // Backward-compatible: index file is always big-endian
         try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapFile(_dictionaryFile, false, 0,
@@ -131,6 +133,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
         numValues = sortedLongs.length;
         Preconditions.checkState(numValues > 0);
         _longValueToIndexMap = new Long2IntOpenHashMap(numValues);
+        _longValueToIndexMap.defaultReturnValue(NOT_FOUND);
 
         // Backward-compatible: index file is always big-endian
         try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapFile(_dictionaryFile, false, 0,
@@ -151,6 +154,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
         numValues = sortedFloats.length;
         Preconditions.checkState(numValues > 0);
         _floatValueToIndexMap = new Float2IntOpenHashMap(numValues);
+        _floatValueToIndexMap.defaultReturnValue(NOT_FOUND);
 
         // Backward-compatible: index file is always big-endian
         try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapFile(_dictionaryFile, false, 0,
@@ -171,6 +175,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
         numValues = sortedDoubles.length;
         Preconditions.checkState(numValues > 0);
         _doubleValueToIndexMap = new Double2IntOpenHashMap(numValues);
+        _doubleValueToIndexMap.defaultReturnValue(NOT_FOUND);
 
         // Backward-compatible: index file is always big-endian
         try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapFile(_dictionaryFile, false, 0,
@@ -191,6 +196,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
         numValues = sortedBigDecimals.length;
         Preconditions.checkState(numValues > 0);
         _objectValueToIndexMap = new Object2IntOpenHashMap<>(numValues);
+        _objectValueToIndexMap.defaultReturnValue(NOT_FOUND);
 
         // Get the maximum length of all entries
         byte[][] sortedBigDecimalBytes = new byte[numValues][];
@@ -213,6 +219,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
         numValues = sortedStrings.length;
         Preconditions.checkState(numValues > 0);
         _objectValueToIndexMap = new Object2IntOpenHashMap<>(numValues);
+        _objectValueToIndexMap.defaultReturnValue(NOT_FOUND);
 
         // Get the maximum length of all entries
         byte[][] sortedStringBytes = new byte[numValues][];
@@ -235,6 +242,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
         numValues = sortedBytes.length;
         Preconditions.checkState(numValues > 0);
         _objectValueToIndexMap = new Object2IntOpenHashMap<>(numValues);
+        _objectValueToIndexMap.defaultReturnValue(NOT_FOUND);
 
         // Get the maximum length of all entries
         byte[][] sortedByteArrays = new byte[numValues][];
@@ -311,21 +319,54 @@ public class SegmentDictionaryCreator implements IndexCreator {
     return _numBytesPerEntry;
   }
 
+  private int checkIdx(int dictId, Object value, DataType valueType) throws IllegalStateException {
+    if (dictId == NOT_FOUND) {
+        throw new IllegalStateException(
+            String.format("Value not found in dictionary for column '%s'. %s: %s. ",
+                         _columnName, valueType.toString(), value));
+    }
+    return dictId;
+  }
+
   public int indexOfSV(Object value) {
     switch (_storedType) {
       case INT:
-        return _intValueToIndexMap.get((int) value);
+        return checkIdx(
+          _intValueToIndexMap.get((int) value),
+          value,
+          _storedType
+        );
       case LONG:
-        return _longValueToIndexMap.get((long) value);
+        return checkIdx(
+          _longValueToIndexMap.get((long) value),
+          value,
+          _storedType
+      );
       case FLOAT:
-        return _floatValueToIndexMap.get((float) value);
+        return checkIdx(
+          _floatValueToIndexMap.get((float) value),
+          value,
+          _storedType
+      );
       case DOUBLE:
-        return _doubleValueToIndexMap.get((double) value);
+        return checkIdx(
+          _doubleValueToIndexMap.get((double) value),
+          value,
+          _storedType
+        );
       case STRING:
       case BIG_DECIMAL:
-        return _objectValueToIndexMap.getInt(value);
+        return checkIdx(
+          _objectValueToIndexMap.getInt(value),
+          value,
+          _storedType
+      );
       case BYTES:
-        return _objectValueToIndexMap.getInt(new ByteArray((byte[]) value));
+        return checkIdx(
+          _objectValueToIndexMap.getInt(new ByteArray((byte[]) value)),
+          value,
+          _storedType
+        );
       default:
         throw new UnsupportedOperationException("Unsupported data type : " + _storedType);
     }
@@ -338,32 +379,56 @@ public class SegmentDictionaryCreator implements IndexCreator {
     switch (_storedType) {
       case INT:
         for (int i = 0; i < multiValues.length; i++) {
-          indexes[i] = _intValueToIndexMap.get((int) multiValues[i]);
+          indexes[i] = checkIdx(
+            _intValueToIndexMap.get((int) multiValues[i]),
+            multiValues[i],
+            _storedType
+          );
         }
         break;
       case LONG:
         for (int i = 0; i < multiValues.length; i++) {
-          indexes[i] = _longValueToIndexMap.get((long) multiValues[i]);
+          indexes[i] = checkIdx(
+            _longValueToIndexMap.get((long) multiValues[i]),
+            multiValues[i],
+            _storedType
+          );
         }
         break;
       case FLOAT:
         for (int i = 0; i < multiValues.length; i++) {
-          indexes[i] = _floatValueToIndexMap.get((float) multiValues[i]);
+          indexes[i] = checkIdx(
+            _floatValueToIndexMap.get((float) multiValues[i]),
+            multiValues[i],
+            _storedType
+          );
         }
         break;
       case DOUBLE:
         for (int i = 0; i < multiValues.length; i++) {
-          indexes[i] = _doubleValueToIndexMap.get((double) multiValues[i]);
+          indexes[i] = checkIdx(
+            _doubleValueToIndexMap.get((double) multiValues[i]),
+            multiValues[i],
+            _storedType
+          );
         }
         break;
       case STRING:
         for (int i = 0; i < multiValues.length; i++) {
-          indexes[i] = _objectValueToIndexMap.getInt(multiValues[i]);
+          indexes[i] = checkIdx(
+            _objectValueToIndexMap.getInt(multiValues[i]),
+            multiValues[i],
+            _storedType
+          );
         }
         break;
       case BYTES:
         for (int i = 0; i < multiValues.length; i++) {
-          indexes[i] = _objectValueToIndexMap.getInt(new ByteArray((byte[]) multiValues[i]));
+          indexes[i] = checkIdx(
+            _objectValueToIndexMap.getInt(new ByteArray((byte[]) multiValues[i])),
+            multiValues[i],
+            _storedType
+          );
         }
         break;
       default:
