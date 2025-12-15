@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.doubles.Double2IntOpenHashMap;
 import it.unimi.dsi.fastutil.floats.Float2IntOpenHashMap;
@@ -70,6 +72,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
   private Object2IntOpenHashMap<Object> _objectValueToIndexMap;
   private int _numBytesPerEntry = 0;
   private static final int NOT_FOUND = -1;
+  private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
 
   public SegmentDictionaryCreator(String columnName, DataType storedType, File indexFile,
       boolean useVarLengthDictionary) {
@@ -319,13 +322,88 @@ public class SegmentDictionaryCreator implements IndexCreator {
     return _numBytesPerEntry;
   }
 
+  /**
+   * Validates a dictionary ID and attempts JSON normalization for STRING types if lookup fails.
+   * For non-STRING types or when JSON normalization is unsuccessful, throws an exception.
+   * 
+   * @param dictId The dictionary ID returned from map lookup (may be NOT_FOUND)
+   * @param value The original value being indexed
+   * @param valueType The data type of the value
+   * @return The validated dictionary ID
+   * @throws IllegalStateException if value not found in dictionary after normalization attempts
+   */
   private int checkIdx(int dictId, Object value, DataType valueType) throws IllegalStateException {
     if (dictId == NOT_FOUND) {
-        throw new IllegalStateException(
-            String.format("Value not found in dictionary for column '%s'. %s: %s. ",
-                         _columnName, valueType.toString(), value));
+      // For STRING types, try JSON normalization before throwing
+      if (valueType == DataType.STRING && value instanceof String) {
+        String normalizedValue = tryNormalizeJson((String) value);
+        if (normalizedValue != null) {
+          int normalizedDictId = _objectValueToIndexMap.getInt(normalizedValue);
+          if (normalizedDictId != NOT_FOUND) {
+            LOGGER.debug("Found equivalent JSON for column '{}': '{}' matches '{}'", 
+                _columnName, value, normalizedValue);
+            return normalizedDictId;
+          }
+        }
+      }
+
+      throw new IllegalStateException(
+          String.format("Value not found in dictionary for column '%s'. %s: %s. ",
+              _columnName, valueType.toString(), value));
     }
     return dictId;
+  }
+
+  /**
+   * Attempts to find a matching JSON string in the dictionary by comparing JSON structure.
+   * Uses Jackson to compare JSON objects ignoring key ordering.
+   * 
+   * @param jsonString The JSON string to find an equivalent for
+   * @return A matching string from the dictionary, or null if no match found
+   */
+  private String tryNormalizeJson(String jsonString) {
+    // Only attempt normalization if it looks like JSON
+    if (!looksLikeJson(jsonString)) {
+      return null;
+    }
+      
+    try {
+      JsonNode inputJson = JSON_MAPPER.readTree(jsonString);
+      
+      // Search through existing dictionary keys for equivalent JSON
+      for (Object existingKey : _objectValueToIndexMap.keySet()) {
+        if (existingKey instanceof String) {
+          String existingStr = (String) existingKey;
+          
+          try {
+            if (jsonEquals(jsonString, existingStr)) {
+              return existingStr;
+            }
+          } catch (Exception e) {
+            // Skip key if comparison fails
+            continue;
+          }
+        }
+      }
+    } catch (Exception e) {
+      LOGGER.debug("Failed to normalize JSON for column '{}': {}", _columnName, jsonString, e);
+    }
+    
+    return null;
+  }
+
+  /**
+   * Compares two JSON strings for structural equality, ignoring key ordering.
+   * 
+   * @param a First JSON string
+   * @param b Second JSON string
+   * @return true if the JSON structures are equal
+   * @throws Exception if JSON parsing fails
+   */
+  private static boolean jsonEquals(String a, String b) throws Exception {
+    JsonNode ja = JSON_MAPPER.readTree(a);
+    JsonNode jb = JSON_MAPPER.readTree(b);
+    return ja.equals(jb);
   }
 
   public int indexOfSV(Object value) {
