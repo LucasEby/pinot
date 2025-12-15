@@ -28,6 +28,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 
+
 /**
  * Record reader for AVRO file.
  */
@@ -37,60 +38,47 @@ public class AvroRecordReader implements RecordReader {
   private DataFileStream<GenericRecord> _avroReader;
   private GenericRecord _reusableAvroRecord = null;
 
-  // NEW: single lock guarding _avroReader + _reusableAvroRecord lifecycle
-  private final Object _lock = new Object();
-
   public AvroRecordReader() {
   }
 
   @Override
   public void init(File dataFile, Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
-    synchronized (_lock) {
-      AvroRecordReaderConfig config = recordReaderConfig == null
-          ? new AvroRecordReaderConfig()
-          : (AvroRecordReaderConfig) recordReaderConfig;
-      _dataFile = dataFile;
-      _avroReader = AvroUtils.getAvroReader(dataFile);
+    AvroRecordReaderConfig config = recordReaderConfig == null
+        ? new AvroRecordReaderConfig()
+        : (AvroRecordReaderConfig) recordReaderConfig;
+    _dataFile = dataFile;
+    _avroReader = AvroUtils.getAvroReader(dataFile);
 
-      AvroRecordExtractorConfig recordExtractorConfig = new AvroRecordExtractorConfig();
-      recordExtractorConfig.setEnableLogicalTypes(config.isEnableLogicalTypes());
-      _recordExtractor = new AvroRecordExtractor();
-      _recordExtractor.init(fieldsToRead, recordExtractorConfig);
-
-      _reusableAvroRecord = null;
-    }
+    AvroRecordExtractorConfig recordExtractorConfig = new AvroRecordExtractorConfig();
+    recordExtractorConfig.setEnableLogicalTypes(config.isEnableLogicalTypes());
+    _recordExtractor = new AvroRecordExtractor();
+    _recordExtractor.init(fieldsToRead, recordExtractorConfig);
   }
 
   @Override
   public boolean hasNext() {
-    synchronized (_lock) {
-      return _avroReader.hasNext();
-    }
+    return _avroReader.hasNext();
   }
 
   @Override
-  public GenericRow next(GenericRow reuse) throws IOException {
-    synchronized (_lock) {
-      _reusableAvroRecord = _avroReader.next(_reusableAvroRecord);
-      _recordExtractor.extract(_reusableAvroRecord, reuse);
-      return reuse;
-    }
+  public GenericRow next(GenericRow reuse)
+      throws IOException {
+    _reusableAvroRecord = _avroReader.next(_reusableAvroRecord);
+    _recordExtractor.extract(_reusableAvroRecord, reuse);
+    return reuse;
   }
 
   @Override
-  public void rewind() throws IOException {
-    synchronized (_lock) {
-      _avroReader.close();
-      _avroReader = AvroUtils.getAvroReader(_dataFile);
-      _reusableAvroRecord = null; // good hygiene after swapping streams
-    }
+  public void rewind()
+      throws IOException {
+    _avroReader.close();
+    _avroReader = AvroUtils.getAvroReader(_dataFile);
   }
 
   @Override
-  public void close() throws IOException {
-    synchronized (_lock) {
-      _avroReader.close();
-    }
+  public void close()
+      throws IOException {
+    _avroReader.close();
   }
 }
