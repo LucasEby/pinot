@@ -29,18 +29,13 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.avro.Schema;
-import org.apache.avro.Schema.Field;
-import org.apache.avro.Schema.Type;
-import org.apache.avro.file.DataFileReader;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecordBuilder;
 import org.apache.commons.io.FileUtils;
@@ -65,15 +60,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.avro.Schema.Field;
-import static org.apache.avro.Schema.Type;
-import static org.apache.avro.Schema.create;
-import static org.apache.avro.Schema.createArray;
-import static org.apache.avro.Schema.createEnum;
-import static org.apache.avro.Schema.createFixed;
-import static org.apache.avro.Schema.createMap;
-import static org.apache.avro.Schema.createRecord;
-import static org.apache.avro.Schema.createUnion;
+import static org.apache.avro.Schema.*;
 
 
 /**
@@ -310,42 +297,13 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
   @Test
   public void testSimpleSelectOnJsonColumn() {
     Operator<SelectionResultsBlock> operator =
-        getOperator("select intColumn, stringColumn, jsonColumn1, jsonColumn2 FROM testTable ORDER BY intColumn limit 100");
+        getOperator("select intColumn, stringColumn, jsonColumn1, jsonColumn2 FROM " + "testTable limit 100");
     SelectionResultsBlock block = operator.nextBlock();
     List<Object[]> rows = new ArrayList<>(block.getRows());
 
-    // Operator<SelectionResultsBlock> operator =
-    //     getOperator("select intColumn, stringColumn, jsonColumn1, jsonColumn2 FROM " + "testTable ORDER BY intColumn limit 100");
-    // SelectionResultsBlock block = operator.nextBlock();
-    // // Collection<Object[]> rows = block.getRows();
-    // List<Object[]> rows = new ArrayList<>(block.getRows());
     Assert.assertEquals(block.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.INT);
     Assert.assertEquals(block.getDataSchema().getColumnDataType(1), DataSchema.ColumnDataType.STRING);
     Assert.assertEquals(block.getDataSchema().getColumnDataType(2), DataSchema.ColumnDataType.JSON);
-
-    // List<String> expecteds = Arrays.asList("[1, daffy duck, [\"this\",\"is\",\"a\",\"test\"], \"UP\"]",
-    //     "[2, mickey mouse, {\"a\":\"1\",\"b\":\"2\"}, \"DOWN\"]", "[3, donald duck, {\"a\":\"1\",\"b\":\"2\"}, \"UP\"]",
-    //     "[4, scrooge mcduck, {\"a\":\"1\",\"b\":\"2\"}, \"LEFT\"]",
-    //     "[5, minney mouse, {\"name\":\"minney\",\"id\":1}, \"RIGHT\"]", "[6, pluto, \"test\", \"DOWN\"]",
-    //     "[7, scooby doo, {\"name\":\"scooby\",\"id\":7}, \"UP\"]");
-
-    // int index = 0;
-    // Iterator<Object[]> iterator = rows.iterator();
-    // while (iterator.hasNext()) {
-    //   Object[] row = iterator.next();
-    //   Assert.assertEquals(Arrays.toString(row), expecteds.get(index++));
-    // }
-
-    // expected: int, string, jsonColumn1, jsonColumn2
-    // Object[][] expectedRows = new Object[][]{
-    //     {1, "daffy duck", "[\"this\",\"is\",\"a\",\"test\"]", "\"UP\""},
-    //     {2, "mickey mouse", "{\"a\":\"1\",\"b\":\"2\"}", "\"DOWN\""},
-    //     {3, "donald duck", "{\"a\":\"1\",\"b\":\"2\"}", "\"UP\""},
-    //     {4, "scrooge mcduck", "{\"a\":\"1\",\"b\":\"2\"}", "\"LEFT\""},
-    //     {5, "minney mouse", "{\"name\":\"minney\",\"id\":1}", "\"RIGHT\""},
-    //     {6, "pluto", "\"test\"", "\"DOWN\""},
-    //     {7, "scooby doo", "{\"name\":\"scooby\",\"id\":7}", "\"UP\""}
-    // };
 
     List<Object[]> expectedRows = new ArrayList<>();
     expectedRows.add(new Object[]{1, "daffy duck", "[\"this\",\"is\",\"a\",\"test\"]", "\"UP\""});
