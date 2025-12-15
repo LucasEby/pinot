@@ -27,6 +27,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -142,7 +143,7 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
   }
 
   private static Map<String, String> createMapField(Pair<String, String>[] pairs) {
-    Map<String, String> map = new LinkedHashMap<>();
+    Map<String, String> map = new HashMap<>();
     for (Pair<String, String> pair : pairs) {
       map.put(pair.getLeft(), pair.getRight());
     }
@@ -237,7 +238,7 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
 
     // Insert simple Java String (gets converted into JSON value)
     inputRecords.add(
-        createTableRecord(6, "pluto", "IPUTTHISINHERE", createEnumField(enumSchema, "DOWN"), createFixedField(fixedSchema, 6),
+        createTableRecord(6, "pluto", "test", createEnumField(enumSchema, "DOWN"), createFixedField(fixedSchema, 6),
             new byte[] {0, 0, 0, 6}, Arrays.asList(
                 new GenericRecordBuilder(createJson5RecordSchema()).set("timestamp", 1719390726)
                     .set("data", createMapField(new Pair[]{Pair.of("a", "6"), Pair.of("b", "12")})).build())));
@@ -263,20 +264,6 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
         fileWriter.append(record);
       }
     }
-
-    System.out.println("\n=== VERIFYING AVRO FILE AFTER CREATION ===");
-    try (DataFileReader<GenericData.Record> reader = 
-         new DataFileReader<>(AVRO_DATA_FILE, new GenericDatumReader<>(avroSchema))) {
-        int rowNum = 1;
-        while (reader.hasNext()) {
-            GenericData.Record record = reader.next();
-            System.out.println("Avro Row " + rowNum + ": intColumn=" + 
-                record.get(INT_COLUMN) + ", jsonColumn1=" + 
-                record.get(JSON_COLUMN_1));
-            rowNum++;
-        }
-    }
-    System.out.println("==========================================\n");
   }
 
   /** Create an AVRO file and then ingest it into Pinot while creating a JsonIndex. */
@@ -319,74 +306,13 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
         }
     }
 
- // Add this to your test file temporarily
- @Test
- public void diagnosticAvroMapOrder() throws Exception {
-   File testFile = new File(INDEX_DIR, "diagnostic.avro");
-
-   // Create schema with map
-   Schema schema = createRecord("test", null, null, false);
-   schema.setFields(Arrays.asList(
-           new Field("testMap", createMap(create(Type.STRING)))
-   ));
-
-   // Write LinkedHashMap with specific order
-   Map<String, String> originalMap = new LinkedHashMap<>();
-   originalMap.put("z", "26");
-   originalMap.put("a", "1");
-   originalMap.put("m", "13");
-
-   System.out.println("Original map: " + originalMap);
-   System.out.println("Original map class: " + originalMap.getClass().getName());
-
-   // Write to Avro
-   try (DataFileWriter<GenericData.Record> writer = new DataFileWriter<>(new GenericDatumWriter<>(schema))) {
-     writer.create(schema, testFile);
-     GenericData.Record record = new GenericData.Record(schema);
-     record.put("testMap", originalMap);
-     writer.append(record);
-   }
-
-   // Read back
-   try (DataFileReader<GenericData.Record> reader = new DataFileReader<>(testFile, new GenericDatumReader<>(schema))) {
-     GenericData.Record record = reader.next();
-     Object readMap = record.get("testMap");
-
-     System.out.println("Read map: " + readMap);
-     System.out.println("Read map class: " + readMap.getClass().getName());
-     System.out.println("Keys in order: " + ((Map<?, ?>) readMap).keySet());
-   }
- }
-
   /** Verify that we can query the JSON column that ingested ComplexType data from an AVRO file (see setUp). */
   @Test
   public void testSimpleSelectOnJsonColumn() {
-    // FrayInTestLauncher.INSTANCE.launchFrayTest(() -> {
     Operator<SelectionResultsBlock> operator =
         getOperator("select intColumn, stringColumn, jsonColumn1, jsonColumn2 FROM testTable ORDER BY intColumn limit 100");
     SelectionResultsBlock block = operator.nextBlock();
     List<Object[]> rows = new ArrayList<>(block.getRows());
-    
-    // DIAGNOSTIC: Print actual row order
-    System.out.println("\n=== ACTUAL ROWS RETURNED ===");
-    for (int i = 0; i < rows.size(); i++) {
-        Object[] row = rows.get(i);
-        System.out.println(String.format("Index %d: intColumn=%s, jsonColumn1=%s", 
-            i, row[0], row[2]));
-        Object jsonValue = row[2];
-        System.out.println("Type: " + jsonValue.getClass().getName());
-    }
-    System.out.println("============================\n");
-
-    System.err.println("\n=== QUERY RESULTS DIAGNOSTIC ===");
-    List<Object[]> rowsD = block.getRows();
-    for (int iD = 0; iD < rowsD.size(); iD++) {
-        Object[] rowD = rowsD.get(iD);
-        System.err.println("Row " + iD + ": intColumn=" + rowD[0] + 
-            ", jsonColumn1=" + rowD[1] +
-            ", identity=" + System.identityHashCode(rowD[1]));
-    }
-    System.err.println("=== END DIAGNOSTIC ===\n");
 
     // Operator<SelectionResultsBlock> operator =
     //     getOperator("select intColumn, stringColumn, jsonColumn1, jsonColumn2 FROM " + "testTable ORDER BY intColumn limit 100");
@@ -427,7 +353,7 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
     expectedRows.add(new Object[]{3, "donald duck", "{\"a\":\"1\",\"b\":\"2\"}", "\"UP\""});
     expectedRows.add(new Object[]{4, "scrooge mcduck", "{\"a\":\"1\",\"b\":\"2\"}", "\"LEFT\""});
     expectedRows.add(new Object[]{5, "minney mouse", "{\"name\":\"minney\",\"id\":1}", "\"RIGHT\""});
-    expectedRows.add(new Object[]{6, "pluto", "\"IPUTTHISINHERE\"", "\"DOWN\""});
+    expectedRows.add(new Object[]{6, "pluto", "\"test\"", "\"DOWN\""});
     expectedRows.add(new Object[]{7, "scooby doo", "{\"name\":\"scooby\",\"id\":7}", "\"UP\""});
 
     int index = 0;
@@ -450,7 +376,6 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
       // jsonColumn2 is just a STRING in this test data
       Assert.assertEquals(row[3], expected[3]);
     }
-    // });
   }
 
   /** Verify simple path expression query on ingested Avro file. */
