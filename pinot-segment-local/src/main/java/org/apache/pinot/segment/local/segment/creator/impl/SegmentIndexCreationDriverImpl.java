@@ -23,7 +23,7 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -315,6 +315,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       _recordReader.rewind();
       LOGGER.info("Start building IndexCreator!");
       GenericRow reuse = new GenericRow();
+      Map<Integer, Integer> rowToStringIdentity = new LinkedHashMap<>();
       int rowNum = 0;
       System.out.println("=== STARTING MAIN INDEX BUILD LOOP ===");
 
@@ -322,25 +323,42 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
         long recordReadStopTimeNs;
         reuse.clear();
 
-        TransformPipeline.Result result;
+//        TransformPipeline.Result result;
         try {
           long recordReadStartTimeNs = System.nanoTime();
-          // GenericRow decodedRow = _recordReader.next(reuse);
-          // result = _transformPipeline.processRow(decodedRow);
 
           GenericRow decodedRow = _recordReader.next(reuse);
           Object jsonValue = decodedRow.getValue("jsonColumn1");
-          System.out.println("BUILD row " + rowNum + " - AFTER read, jsonColumn1: " + jsonValue +
-                  " (identity: " + System.identityHashCode(jsonValue) + ")");
+
+          System.out.println("BUILD row " + rowNum + " - jsonColumn1: " + jsonValue +
+                  " (identity: " + System.identityHashCode(jsonValue) +
+                  ", class: " + (jsonValue != null ? jsonValue.getClass().getName() : "null") + ")");
 
           // DEFENSIVE COPY: Create a safe copy to prevent row reuse corruption
           GenericRow safeCopy = decodedRow.copy();
 
           Object copiedJson = safeCopy.getValue("jsonColumn1");
-          System.out.println("BUILD row " + rowNum + " - AFTER copy, jsonColumn1: " + copiedJson +
-                  " (identity: " + System.identityHashCode(copiedJson) + ")");
+          System.out.println("  After copy - jsonColumn1: " + copiedJson +
+                  " (identity: " + System.identityHashCode(copiedJson) +
+                  ", class: " + (copiedJson != null ? copiedJson.getClass().getName() : "null") + ")");
 
-          result = _transformPipeline.processRow(safeCopy);
+          // Track String object identities across ALL rows
+          int copiedIdentity = System.identityHashCode(copiedJson);
+          if (rowToStringIdentity.containsValue(copiedIdentity)) {
+            System.out.println("  WARNING: Object identity " + copiedIdentity +
+                    " REUSED from previous row!");
+            for (Map.Entry<Integer, Integer> entry : rowToStringIdentity.entrySet()) {
+              if (entry.getValue() == copiedIdentity) {
+                System.out.println("  Previously seen in row " + entry.getKey());
+              }
+            }
+          }
+            rowToStringIdentity.put(rowNum, copiedIdentity);
+          } else {
+              System.out.println("copiedJson is a " + copiedJson.getClass().getName());
+          }
+
+          TransformPipeline.Result result = _transformPipeline.processRow(safeCopy);
 
           recordReadStopTimeNs = System.nanoTime();
           _totalRecordReadTimeNs += recordReadStopTimeNs - recordReadStartTimeNs;
@@ -356,12 +374,15 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
         for (GenericRow row : result.getTransformedRows()) {
           Object transformedJson = row.getValue("jsonColumn1");
-          System.out.println("BUILD row " + rowNum + " - BEFORE indexRow, jsonColumn1: " + transformedJson +
-                  " (identity: " + System.identityHashCode(transformedJson) + ")");
+          System.out.println("  After transform - jsonColumn1: " + transformedJson +
+                  " (identity: " + System.identityHashCode(transformedJson) +
+                  ", class: " + (transformedJson != null ? transformedJson.getClass().getName() : "null") + ")");
+
+          // Track the transformed String identity
+          int transformedIdentity = System.identityHashCode(transformedJson);
+          System.out.println("  Indexing row " + rowNum + " with String identity: " + transformedIdentity);
 
           _indexCreator.indexRow(row);
-
-          System.out.println("BUILD row " + rowNum + " - AFTER indexRow, jsonColumn1: " + row.getValue("jsonColumn1"));
         }
         _totalIndexTimeNs += System.nanoTime() - recordReadStopTimeNs;
         _incompleteRowsFound += result.getIncompleteRowCount();
@@ -578,7 +599,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
     if (!postSegCreationIndexes.isEmpty()) {
       // Build other indexes
-      Map<String, Object> props = new HashMap<>();
+      Map<String, Object> props = new LinkedHashMap<>();
       props.put(IndexLoadingConfig.READ_MODE_KEY, ReadMode.mmap);
       PinotConfiguration segmentDirectoryConfigs = new PinotConfiguration(props);
 
@@ -670,141 +691,77 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   /**
    * Complete the stats gathering process and store the stats information in indexCreationInfoMap.
    */
-//  void collectStatsAndIndexCreationInfo()
-//      throws Exception {
-//    long statsCollectorStartTime = System.nanoTime();
-//
-//    System.out.println("SegmentIndexCreationDriverImpl START: collectStatsAndIndexCreationInfo");
-//    // Initialize stats collection
-//    _segmentStats = _dataSource.gatherStats(
-//        new StatsCollectorConfig(_config.getTableConfig(), _dataSchema, _config.getSegmentPartitionConfig()));
-//
-//    System.out.println("=== collectStatsAndIndexCreationInfo: gatherStats complete ===");
-//
-//    _totalDocs = _segmentStats.getTotalDocCount();
-//    Map<String, FieldIndexConfigs> indexConfigsMap = _config.getIndexConfigsByColName();
-//
-//    for (FieldSpec fieldSpec : _dataSchema.getAllFieldSpecs()) {
-//      // Ignore virtual columns
-//      // System.out.println("Field spec: " + fieldSpec + " isVirtualColumn? " + fieldSpec.isVirtualColumn());
-//      if (fieldSpec.isVirtualColumn()) {
-//        continue;
-//      }
-//
-//      String column = fieldSpec.getName();
-//      DataType storedType = fieldSpec.getDataType().getStoredType();
-//      ColumnStatistics columnProfile = _segmentStats.getColumnProfileFor(column);
-//      DictionaryIndexConfig dictionaryIndexConfig = indexConfigsMap.get(column).getConfig(StandardIndexes.dictionary());
-//      boolean createDictionary = dictionaryIndexConfig.isDisabled();
-//      boolean useVarLengthDictionary = dictionaryIndexConfig.getUseVarLengthDictionary()
-//          || DictionaryIndexType.optimizeTypeShouldUseVarLengthDictionary(storedType, columnProfile);
-//      Object defaultNullValue = fieldSpec.getDefaultNullValue();
-//      if (storedType == DataType.BYTES) {
-//        defaultNullValue = new ByteArray((byte[]) defaultNullValue);
-//      }
-//      _indexCreationInfoMap.put(column,
-//          new ColumnIndexCreationInfo(columnProfile, createDictionary, useVarLengthDictionary, false/*isAutoGenerated*/,
-//              defaultNullValue));
-//
-//      if ("jsonColumn1".equals(column)) {
-//        System.out.println("  Creating ColumnIndexCreationInfo for jsonColumn1");
-//        System.out.println("    ColumnStatistics identity: " + System.identityHashCode(columnProfile));
-//        System.out.println("    ColumnIndexCreationInfo identity: " + System.identityHashCode(creationInfo));
-//        System.out.println("    Distinct values: " + creationInfo.getDistinctValueCount());
-//
-//        Object sortedElements = creationInfo.getSortedUniqueElementsArray();
-//        if (sortedElements != null && sortedElements.getClass().isArray()) {
-//          int length = java.lang.reflect.Array.getLength(sortedElements);
-//          System.out.println("    Sorted elements array length: " + length);
-//          for (int i = 0; i < Math.min(3, length); i++) {
-//            Object elem = java.lang.reflect.Array.get(sortedElements, i);
-//            System.out.println("      Element " + i + ": " + elem +
-//                    " (identity: " + System.identityHashCode(elem) + ")");
-//          }
-//        }
-//      }
-//
-//      // Now put it in the map
-//      _indexCreationInfoMap.put(column, creationInfo);
-//    }
-//
-//    _segmentIndexCreationInfo.setTotalDocs(_totalDocs);
-//    _totalStatsCollectorTimeNs = System.nanoTime() - statsCollectorStartTime;
-//
-//    System.out.println("=== collectStatsAndIndexCreationInfo: END ===");
-//    inspectIndexCreationInfo();
-//  }
-
   void collectStatsAndIndexCreationInfo() throws Exception {
     long statsCollectorStartTime = System.nanoTime();
 
     System.out.println("=== collectStatsAndIndexCreationInfo: START ===");
-    System.out.println("=== _dataSource class: " + _dataSource.getClass().getName() + " ===");
-    System.out.println("=== _dataSource toString: " + _dataSource + " ===");
-
+    
     _segmentStats = _dataSource.gatherStats(
-            new StatsCollectorConfig(_config.getTableConfig(), _dataSchema, _config.getSegmentPartitionConfig()));
-
-    System.out.println("=== gatherStats returned, _segmentStats class: " +
-            (_segmentStats != null ? _segmentStats.getClass().getName() : "null") + " ===");
-    System.out.println("=== collectStatsAndIndexCreationInfo: gatherStats complete ===");
-
-    _totalDocs = _segmentStats.getTotalDocCount(); // is 7 whether passes or fails
+        new StatsCollectorConfig(_config.getTableConfig(), _dataSchema, _config.getSegmentPartitionConfig()));
+    
+    _totalDocs = _segmentStats.getTotalDocCount();
     Map<String, FieldIndexConfigs> indexConfigsMap = _config.getIndexConfigsByColName();
 
-    System.out.println("Total number of FieldSpecs: " + _dataSchema.getAllFieldSpecs().size());
     for (FieldSpec fieldSpec : _dataSchema.getAllFieldSpecs()) {
-      // Ignore virtual columns
-      if (fieldSpec.isVirtualColumn()) {
-        continue;
-      }
-
-      String column = fieldSpec.getName();
-      DataType storedType = fieldSpec.getDataType().getStoredType();
-      ColumnStatistics columnProfile = _segmentStats.getColumnProfileFor(column);
-      DictionaryIndexConfig dictionaryIndexConfig = indexConfigsMap.get(column).getConfig(StandardIndexes.dictionary());
-      boolean createDictionary = dictionaryIndexConfig.isDisabled();
-      boolean useVarLengthDictionary = dictionaryIndexConfig.getUseVarLengthDictionary()
-              || DictionaryIndexType.optimizeTypeShouldUseVarLengthDictionary(storedType, columnProfile);
-      Object defaultNullValue = fieldSpec.getDefaultNullValue();
-      if (storedType == DataType.BYTES) {
-        defaultNullValue = new ByteArray((byte[]) defaultNullValue);
-      }
-
-      // Create the info object
-      ColumnIndexCreationInfo creationInfo = new ColumnIndexCreationInfo(columnProfile, createDictionary,
-              useVarLengthDictionary, false, defaultNullValue);
-
-      // PUT THE DEBUG CODE HERE, BEFORE putting into the map
-      if ("jsonColumn1".equals(column)) {
-        System.out.println("  Creating ColumnIndexCreationInfo for jsonColumn1");
-        System.out.println("    ColumnStatistics identity: " + System.identityHashCode(columnProfile));
-        System.out.println("    ColumnIndexCreationInfo identity: " + System.identityHashCode(creationInfo));
-        System.out.println("    Distinct values: " + creationInfo.getDistinctValueCount());
-        System.out.println("    Total number of entries: " + creationInfo.getTotalNumberOfEntries());
-
-        Object sortedElements = creationInfo.getSortedUniqueElementsArray();
-        if (sortedElements != null && sortedElements.getClass().isArray()) {
-          int length = java.lang.reflect.Array.getLength(sortedElements);
-          System.out.println("    Sorted elements array length: " + length);
-          for (int i = 0; i < Math.min(3, length); i++) {
-            Object elem = java.lang.reflect.Array.get(sortedElements, i);
-            System.out.println("      Element " + i + ": " + elem +
-                    " (identity: " + System.identityHashCode(elem) + ")");
-          }
+        if (fieldSpec.isVirtualColumn()) {
+            continue;
         }
-      }
 
-      // Now put it in the map
-      _indexCreationInfoMap.put(column, creationInfo);
+        String column = fieldSpec.getName();
+        DataType storedType = fieldSpec.getDataType().getStoredType();
+        
+        // GET THE COLUMN STATISTICS
+        ColumnStatistics columnProfile = _segmentStats.getColumnProfileFor(column);
+        
+        // DEBUG: Identify which stats collector class is being used for jsonColumn1
+        if ("jsonColumn1".equals(column)) {
+            System.out.println("\n=== IDENTIFYING jsonColumn1 STATS COLLECTOR ===");
+            System.out.println("columnProfile class: " + columnProfile.getClass().getName());
+            System.out.println("columnProfile toString: " + columnProfile);
+            System.out.println("Cardinality: " + columnProfile.getCardinality());
+            System.out.println("Total entries: " + columnProfile.getTotalNumberOfEntries());
+            
+            // Try to call getUniqueValuesSet and see what happens
+            try {
+                Object uniqueValuesSet = columnProfile.getUniqueValuesSet();
+                System.out.println("getUniqueValuesSet() succeeded!");
+                System.out.println("  Class: " + (uniqueValuesSet != null ? uniqueValuesSet.getClass().getName() : "null"));
+                
+                // Print the values
+                if (uniqueValuesSet != null && uniqueValuesSet.getClass().isArray()) {
+                    int length = java.lang.reflect.Array.getLength(uniqueValuesSet);
+                    System.out.println("  Array length: " + length);
+                    for (int i = 0; i < length; i++) {
+                        Object val = java.lang.reflect.Array.get(uniqueValuesSet, i);
+                        System.out.println("    [" + i + "]: " + val + " (identity: " + System.identityHashCode(val) + ")");
+                    }
+                }
+            } catch (Exception e) {
+                System.out.println("getUniqueValuesSet() threw exception: " + e.getClass().getName() + ": " + e.getMessage());
+                System.out.println("This means we're using NoDictColumnStatisticsCollector");
+            }
+            System.out.println("=== END IDENTIFICATION ===\n");
+        }
+        
+        // ... rest of the method
+        DictionaryIndexConfig dictionaryIndexConfig = indexConfigsMap.get(column).getConfig(StandardIndexes.dictionary());
+        boolean createDictionary = dictionaryIndexConfig.isDisabled();
+        boolean useVarLengthDictionary = dictionaryIndexConfig.getUseVarLengthDictionary()
+            || DictionaryIndexType.optimizeTypeShouldUseVarLengthDictionary(storedType, columnProfile);
+        Object defaultNullValue = fieldSpec.getDefaultNullValue();
+        if (storedType == DataType.BYTES) {
+            defaultNullValue = new ByteArray((byte[]) defaultNullValue);
+        }
+        
+        _indexCreationInfoMap.put(column,
+            new ColumnIndexCreationInfo(columnProfile, createDictionary, useVarLengthDictionary, false, defaultNullValue));
     }
-
+    
     _segmentIndexCreationInfo.setTotalDocs(_totalDocs);
     _totalStatsCollectorTimeNs = System.nanoTime() - statsCollectorStartTime;
-
+    
     System.out.println("=== collectStatsAndIndexCreationInfo: END ===");
-    inspectIndexCreationInfo();
-  }
+}
 
   /**
    * Uses config and column properties like storedType and length of elements to determine if

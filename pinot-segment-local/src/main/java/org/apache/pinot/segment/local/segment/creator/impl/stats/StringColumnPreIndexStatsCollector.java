@@ -49,46 +49,113 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
     }
   }
 
+  // @Override
+  // public void collect(Object entry) {
+  //   assert !_sealed;
+
+  //   if (entry instanceof Object[]) {
+  //     Object[] values = (Object[]) entry;
+  //     int rowLength = 0;
+  //     for (Object obj : values) {
+  //       String value = (String) obj;
+  //       _values.add(value);
+  //       if (_clpStatsCollector != null) {
+  //         _clpStatsCollector.collect(value);
+  //       }
+
+  //       int length = value.getBytes(UTF_8).length;
+  //       _minLength = Math.min(_minLength, length);
+  //       _maxLength = Math.max(_maxLength, length);
+  //       rowLength += length;
+  //     }
+
+  //     _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
+  //     _maxRowLength = Math.max(_maxRowLength, rowLength);
+  //     updateTotalNumberOfEntries(values);
+  //   } else {
+  //     String value = (String) entry;
+  //     addressSorted(value);
+  //     if (_clpStatsCollector != null) {
+  //       _clpStatsCollector.collect(value);
+  //     }
+  //     if (_values.add(value)) {
+  //       if (isPartitionEnabled()) {
+  //         updatePartition(value);
+  //       }
+  //       int valueLength = value.getBytes(UTF_8).length;
+  //       _minLength = Math.min(_minLength, valueLength);
+  //       _maxLength = Math.max(_maxLength, valueLength);
+  //       _maxRowLength = _maxLength;
+  //     }
+  //     _totalNumberOfEntries++;
+  //   }
+  // }
+
   @Override
   public void collect(Object entry) {
-    assert !_sealed;
+      assert !_sealed;
 
-    if (entry instanceof Object[]) {
-      Object[] values = (Object[]) entry;
-      int rowLength = 0;
-      for (Object obj : values) {
-        String value = (String) obj;
-        _values.add(value);
-        if (_clpStatsCollector != null) {
-          _clpStatsCollector.collect(value);
-        }
+      if (entry instanceof Object[]) {
+          Object[] values = (Object[]) entry;
+          int rowLength = 0;
+          for (Object obj : values) {
+              String value = (String) obj;
+              
+              // DEBUG: Log what we're adding
+              int sizeBefore = _values.size();
+              boolean wasAdded = _values.add(value);
+              int sizeAfter = _values.size();
+              
+              System.err.println("collect() - Adding to set: " + value);
+              System.err.println("  String identity: " + System.identityHashCode(value));
+              System.err.println("  String hashCode: " + value.hashCode());
+              System.err.println("  Set size before: " + sizeBefore + ", after: " + sizeAfter);
+              System.err.println("  Was added: " + wasAdded + " (duplicate: " + !wasAdded + ")");
+              System.err.flush();
+              
+              if (_clpStatsCollector != null) {
+                  _clpStatsCollector.collect(value);
+              }
 
-        int length = value.getBytes(UTF_8).length;
-        _minLength = Math.min(_minLength, length);
-        _maxLength = Math.max(_maxLength, length);
-        rowLength += length;
-      }
+              int length = value.getBytes(UTF_8).length;
+              _minLength = Math.min(_minLength, length);
+              _maxLength = Math.max(_maxLength, length);
+              rowLength += length;
+          }
 
-      _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
-      _maxRowLength = Math.max(_maxRowLength, rowLength);
-      updateTotalNumberOfEntries(values);
-    } else {
-      String value = (String) entry;
-      addressSorted(value);
-      if (_clpStatsCollector != null) {
-        _clpStatsCollector.collect(value);
+          _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
+          _maxRowLength = Math.max(_maxRowLength, rowLength);
+          updateTotalNumberOfEntries(values);
+      } else {
+          String value = (String) entry;
+          addressSorted(value);
+          if (_clpStatsCollector != null) {
+              _clpStatsCollector.collect(value);
+          }
+          
+          // DEBUG: Log what we're adding
+          int sizeBefore = _values.size();
+          boolean wasAdded = _values.add(value);
+          int sizeAfter = _values.size();
+          
+          System.err.println("collect() single value - Adding to set: " + value);
+          System.err.println("  String identity: " + System.identityHashCode(value));
+          System.err.println("  String hashCode: " + value.hashCode());
+          System.err.println("  Set size before: " + sizeBefore + ", after: " + sizeAfter);
+          System.err.println("  Was added: " + wasAdded + " (duplicate: " + !wasAdded + ")");
+          System.err.flush();
+          
+          if (wasAdded) {
+              if (isPartitionEnabled()) {
+                  updatePartition(value);
+              }
+              int valueLength = value.getBytes(UTF_8).length;
+              _minLength = Math.min(_minLength, valueLength);
+              _maxLength = Math.max(_maxLength, valueLength);
+              _maxRowLength = _maxLength;
+          }
+          _totalNumberOfEntries++;
       }
-      if (_values.add(value)) {
-        if (isPartitionEnabled()) {
-          updatePartition(value);
-        }
-        int valueLength = value.getBytes(UTF_8).length;
-        _minLength = Math.min(_minLength, valueLength);
-        _maxLength = Math.max(_maxLength, valueLength);
-        _maxRowLength = _maxLength;
-      }
-      _totalNumberOfEntries++;
-    }
   }
 
   @Override

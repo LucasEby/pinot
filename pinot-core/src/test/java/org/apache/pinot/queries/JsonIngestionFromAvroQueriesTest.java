@@ -318,6 +318,45 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
             Assert.fail("Failed to parse JSON: " + e.getMessage(), e);
         }
     }
+//
+//  // Add this to your test file temporarily
+//  @Test
+//  public void diagnosticAvroMapOrder() throws Exception {
+//    File testFile = new File(INDEX_DIR, "diagnostic.avro");
+//
+//    // Create schema with map
+//    Schema schema = createRecord("test", null, null, false);
+//    schema.setFields(Arrays.asList(
+//            new Field("testMap", createMap(create(Type.STRING)))
+//    ));
+//
+//    // Write LinkedHashMap with specific order
+//    Map<String, String> originalMap = new LinkedHashMap<>();
+//    originalMap.put("z", "26");
+//    originalMap.put("a", "1");
+//    originalMap.put("m", "13");
+//
+//    System.out.println("Original map: " + originalMap);
+//    System.out.println("Original map class: " + originalMap.getClass().getName());
+//
+//    // Write to Avro
+//    try (DataFileWriter<GenericData.Record> writer = new DataFileWriter<>(new GenericDatumWriter<>(schema))) {
+//      writer.create(schema, testFile);
+//      GenericData.Record record = new GenericData.Record(schema);
+//      record.put("testMap", originalMap);
+//      writer.append(record);
+//    }
+//
+//    // Read back
+//    try (DataFileReader<GenericData.Record> reader = new DataFileReader<>(testFile, new GenericDatumReader<>(schema))) {
+//      GenericData.Record record = reader.next();
+//      Object readMap = record.get("testMap");
+//
+//      System.out.println("Read map: " + readMap);
+//      System.out.println("Read map class: " + readMap.getClass().getName());
+//      System.out.println("Keys in order: " + ((Map<?, ?>) readMap).keySet());
+//    }
+//  }
 
   /** Verify that we can query the JSON column that ingested ComplexType data from an AVRO file (see setUp). */
   @Test
