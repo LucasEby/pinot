@@ -23,7 +23,7 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.LinkedHashMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -37,7 +37,6 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.metrics.MinionMetrics;
-import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.realtime.converter.stats.RealtimeSegmentSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.RecordReaderSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
@@ -50,7 +49,6 @@ import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.segment.local.utils.CrcUtils;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
-import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.converter.SegmentFormatConverter;
@@ -63,7 +61,6 @@ import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsContainer;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
-import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.IndexHandler;
@@ -72,8 +69,6 @@ import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
-import org.apache.pinot.segment.spi.index.reader.Dictionary;
-import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
@@ -256,39 +251,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     return null;
   }
 
-  // Helper method to inspect what's in _indexCreationInfoMap
-  private void inspectIndexCreationInfo() {
-    if (_indexCreationInfoMap == null) {
-      System.out.println("  _indexCreationInfoMap is null");
-      return;
-    }
-
-    ColumnIndexCreationInfo jsonInfo = _indexCreationInfoMap.get("jsonColumn1");
-    if (jsonInfo == null) {
-      System.out.println("  No jsonColumn1 in _indexCreationInfoMap");
-      return;
-    }
-
-    System.out.println("  jsonColumn1 distinct value count: " + jsonInfo.getDistinctValueCount());
-    System.out.println("  jsonColumn1 total entries: " + jsonInfo.getTotalNumberOfEntries());
-
-    Object sortedElements = jsonInfo.getSortedUniqueElementsArray();
-    System.out.println("  jsonColumn1 sorted elements identity: " + System.identityHashCode(sortedElements));
-    System.out.println("  jsonColumn1 sorted elements type: " +
-            (sortedElements != null ? sortedElements.getClass().getName() : "null"));
-
-    // If it's an array, print some values
-    if (sortedElements != null && sortedElements.getClass().isArray()) {
-      int length = java.lang.reflect.Array.getLength(sortedElements);
-      System.out.println("  jsonColumn1 sorted elements array length: " + length);
-      for (int i = 0; i < Math.min(5, length); i++) {
-        Object elem = java.lang.reflect.Array.get(sortedElements, i);
-        System.out.println("    Element " + i + ": " + elem +
-                " (identity: " + System.identityHashCode(elem) + ")");
-      }
-    }
-  }
-
   @Override
   public void build()
       throws Exception {
@@ -320,48 +282,15 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       _recordReader.rewind();
       LOGGER.info("Start building IndexCreator!");
       GenericRow reuse = new GenericRow();
-      Map<Integer, Integer> rowToStringIdentity = new LinkedHashMap<>();
-      int rowNum = 0;
-      System.out.println("=== STARTING MAIN INDEX BUILD LOOP ===");
-
       while (_recordReader.hasNext()) {
         long recordReadStopTimeNs;
         reuse.clear();
 
-       TransformPipeline.Result result;
+        TransformPipeline.Result result;
         try {
           long recordReadStartTimeNs = System.nanoTime();
-
           GenericRow decodedRow = _recordReader.next(reuse);
-          Object jsonValue = decodedRow.getValue("jsonColumn1");
-
-          System.out.println("BUILD row " + rowNum + " - jsonColumn1: " + jsonValue +
-                  " (identity: " + System.identityHashCode(jsonValue) +
-                  ", class: " + (jsonValue != null ? jsonValue.getClass().getName() : "null") + ")");
-
-          // DEFENSIVE COPY: Create a safe copy to prevent row reuse corruption
-          GenericRow safeCopy = decodedRow.copy();
-
-          Object copiedJson = safeCopy.getValue("jsonColumn1");
-          System.out.println("  After copy - jsonColumn1: " + copiedJson +
-                  " (identity: " + System.identityHashCode(copiedJson) +
-                  ", class: " + (copiedJson != null ? copiedJson.getClass().getName() : "null") + ")");
-
-          // Track String object identities across ALL rows
-          int copiedIdentity = System.identityHashCode(copiedJson);
-          if (rowToStringIdentity.containsValue(copiedIdentity)) {
-            System.out.println("  WARNING: Object identity " + copiedIdentity +
-                    " REUSED from previous row!");
-            for (Map.Entry<Integer, Integer> entry : rowToStringIdentity.entrySet()) {
-              if (entry.getValue() == copiedIdentity) {
-                System.out.println("  Previously seen in row " + entry.getKey());
-              }
-            }
-          }
-          rowToStringIdentity.put(rowNum, copiedIdentity);
-
-          result = _transformPipeline.processRow(safeCopy);
-
+          result = _transformPipeline.processRow(decodedRow);
           recordReadStopTimeNs = System.nanoTime();
           _totalRecordReadTimeNs += recordReadStopTimeNs - recordReadStartTimeNs;
         } catch (Exception e) {
@@ -375,24 +304,13 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
         }
 
         for (GenericRow row : result.getTransformedRows()) {
-          Object transformedJson = row.getValue("jsonColumn1");
-          System.out.println("  After transform - jsonColumn1: " + transformedJson +
-                  " (identity: " + System.identityHashCode(transformedJson) +
-                  ", class: " + (transformedJson != null ? transformedJson.getClass().getName() : "null") + ")");
-
-          // Track the transformed String identity
-          int transformedIdentity = System.identityHashCode(transformedJson);
-          System.out.println("  Indexing row " + rowNum + " with String identity: " + transformedIdentity);
-
           _indexCreator.indexRow(row);
         }
         _totalIndexTimeNs += System.nanoTime() - recordReadStopTimeNs;
         _incompleteRowsFound += result.getIncompleteRowCount();
         _skippedRowsFound += result.getSkippedRowCount();
         _sanitizedRowsFound += result.getSanitizedRowCount();
-        rowNum++;
       }
-      System.out.println("=== FINISHED MAIN INDEX BUILD LOOP ===");
     } catch (Exception e) {
       _indexCreator.close();
       throw e;
@@ -401,16 +319,13 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     }
 
     if (_incompleteRowsFound > 0) {
-      System.out.println("Incomplete data found for " + _incompleteRowsFound + " records. This can be due to error during reader or transformations");
       LOGGER.warn("Incomplete data found for {} records. This can be due to error during reader or transformations",
           _incompleteRowsFound);
     }
     if (_skippedRowsFound > 0) {
-      System.out.println("Skipped " + _skippedRowsFound + " records during transformation");
       LOGGER.info("Skipped {} records during transformation", _skippedRowsFound);
     }
     if (_sanitizedRowsFound > 0) {
-      System.out.println("Sanitized " + _sanitizedRowsFound + " records during transformation");
       LOGGER.info("Sanitized {} records during transformation", _sanitizedRowsFound);
     }
 
@@ -501,8 +416,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       // Write the index files to disk
       _indexCreator.setSegmentName(_segmentName);
       _indexCreator.seal();
-      System.out.println("=== CHECKPOINT: After seal - Reading back indexed values ===");
-      inspectIndexedSegment(_tempIndexDir);
     } finally {
       _indexCreator.close();
     }
@@ -521,27 +434,13 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     // Delete the temporary directory
     FileUtils.deleteQuietly(_tempIndexDir);
 
-    System.out.println("=== CHECKPOINT: After move - Reading back values ===");
-    inspectIndexedSegment(segmentOutputDir);
-
     convertFormatIfNecessary(segmentOutputDir);
-
-    System.out.println("=== CHECKPOINT: After convertFormat - Reading back values ===");
-    inspectIndexedSegment(segmentOutputDir);
 
     if (_totalDocs > 0) {
       buildStarTreeV2IfNecessary(segmentOutputDir);
-      System.out.println("=== CHECKPOINT: After starTree - Reading back values ===");
-      inspectIndexedSegment(segmentOutputDir);
-
       buildMultiColumnTextIndex(segmentOutputDir);
-      System.out.println("=== CHECKPOINT: After textIndex - Reading back values ===");
-      inspectIndexedSegment(segmentOutputDir);
     }
-
     updatePostSegmentCreationIndexes(segmentOutputDir);
-    System.out.println("=== CHECKPOINT: After updateIndexes - Reading back values ===");
-    inspectIndexedSegment(segmentOutputDir);
 
     // Compute CRC and creation time
     long crc = CrcUtils.forAllFilesInFolder(segmentOutputDir).computeCrc();
@@ -564,28 +463,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     LOGGER.info("Driver, record read time (in ms) : {}", TimeUnit.NANOSECONDS.toMillis(_totalRecordReadTimeNs));
     LOGGER.info("Driver, stats collector time (in ms) : {}", TimeUnit.NANOSECONDS.toMillis(_totalStatsCollectorTimeNs));
     LOGGER.info("Driver, indexing time (in ms) : {}", TimeUnit.NANOSECONDS.toMillis(_totalIndexTimeNs));
-  }
-
-  private void inspectIndexedSegment(File segmentDir) {
-    try {
-          IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_config.getTableConfig(), _dataSchema);
-          ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDir, indexLoadingConfig);
-          
-          DataSource dataSource = segment.getDataSource("jsonColumn1");
-          ForwardIndexReader reader = dataSource.getForwardIndex();
-          Dictionary dictionary = dataSource.getDictionary();
-          
-          System.out.println("  jsonColumn1 values:");
-          for (int i = 0; i < Math.min(7, segment.getSegmentMetadata().getTotalDocs()); i++) {
-              int dictId = reader.getDictId(i, null);
-              Object value = dictionary.get(dictId);
-              System.out.println("    Row " + i + ": dictId=" + dictId + ", value=" + value);
-          }
-          
-          segment.destroy();
-      } catch (Exception e) {
-          System.out.println("  Failed to inspect: " + e.getMessage());
-      }
   }
 
   private void buildMultiColumnTextIndex(File segmentOutputDir)
@@ -625,7 +502,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
     if (!postSegCreationIndexes.isEmpty()) {
       // Build other indexes
-      Map<String, Object> props = new LinkedHashMap<>();
+      Map<String, Object> props = new HashMap<>();
       props.put(IndexLoadingConfig.READ_MODE_KEY, ReadMode.mmap);
       PinotConfiguration segmentDirectoryConfigs = new PinotConfiguration(props);
 
@@ -685,17 +562,13 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   // copy for indexes for which we don't know sizes upfront.
   private void convertFormatIfNecessary(File segmentDirectory)
       throws Exception {
-    System.out.println("=== convertFormatIfNecessary: segmentVersion = " + _config.getSegmentVersion() + " ===");
     SegmentVersion versionToGenerate = _config.getSegmentVersion();
     if (versionToGenerate.equals(SegmentVersion.v1)) {
-      System.out.println("=== convertFormatIfNecessary: v1, returning early ===");
       // v1 by default
       return;
     }
-    System.out.println("=== convertFormatIfNecessary: converting to v3 ===");
     SegmentFormatConverter converter = SegmentFormatConverterFactory.getConverter(SegmentVersion.v1, SegmentVersion.v3);
     converter.convert(segmentDirectory);
-    System.out.println("=== convertFormatIfNecessary: conversion complete ===");
   }
 
   @Override
@@ -717,77 +590,40 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   /**
    * Complete the stats gathering process and store the stats information in indexCreationInfoMap.
    */
-  void collectStatsAndIndexCreationInfo() throws Exception {
+  void collectStatsAndIndexCreationInfo()
+      throws Exception {
     long statsCollectorStartTime = System.nanoTime();
 
-    System.out.println("=== collectStatsAndIndexCreationInfo: START ===");
-    
+    // Initialize stats collection
     _segmentStats = _dataSource.gatherStats(
         new StatsCollectorConfig(_config.getTableConfig(), _dataSchema, _config.getSegmentPartitionConfig()));
-    
     _totalDocs = _segmentStats.getTotalDocCount();
     Map<String, FieldIndexConfigs> indexConfigsMap = _config.getIndexConfigsByColName();
 
     for (FieldSpec fieldSpec : _dataSchema.getAllFieldSpecs()) {
-        if (fieldSpec.isVirtualColumn()) {
-            continue;
-        }
+      // Ignore virtual columns
+      if (fieldSpec.isVirtualColumn()) {
+        continue;
+      }
 
-        String column = fieldSpec.getName();
-        DataType storedType = fieldSpec.getDataType().getStoredType();
-        
-        // GET THE COLUMN STATISTICS
-        ColumnStatistics columnProfile = _segmentStats.getColumnProfileFor(column);
-        
-        // DEBUG: Identify which stats collector class is being used for jsonColumn1
-        if ("jsonColumn1".equals(column)) {
-            System.out.println("\n=== IDENTIFYING jsonColumn1 STATS COLLECTOR ===");
-            System.out.println("columnProfile class: " + columnProfile.getClass().getName());
-            System.out.println("columnProfile toString: " + columnProfile);
-            System.out.println("Cardinality: " + columnProfile.getCardinality());
-            System.out.println("Total entries: " + columnProfile.getTotalNumberOfEntries());
-            
-            // Try to call getUniqueValuesSet and see what happens
-            try {
-                Object uniqueValuesSet = columnProfile.getUniqueValuesSet();
-                System.out.println("getUniqueValuesSet() succeeded!");
-                System.out.println("  Class: " + (uniqueValuesSet != null ? uniqueValuesSet.getClass().getName() : "null"));
-                
-                // Print the values
-                if (uniqueValuesSet != null && uniqueValuesSet.getClass().isArray()) {
-                    int length = java.lang.reflect.Array.getLength(uniqueValuesSet);
-                    System.out.println("  Array length: " + length);
-                    for (int i = 0; i < length; i++) {
-                        Object val = java.lang.reflect.Array.get(uniqueValuesSet, i);
-                        System.out.println("    [" + i + "]: " + val + " (identity: " + System.identityHashCode(val) + ")");
-                    }
-                }
-            } catch (Exception e) {
-                System.out.println("getUniqueValuesSet() threw exception: " + e.getClass().getName() + ": " + e.getMessage());
-                System.out.println("This means we're using NoDictColumnStatisticsCollector");
-            }
-            System.out.println("=== END IDENTIFICATION ===\n");
-        }
-        
-        // ... rest of the method
-        DictionaryIndexConfig dictionaryIndexConfig = indexConfigsMap.get(column).getConfig(StandardIndexes.dictionary());
-        boolean createDictionary = dictionaryIndexConfig.isDisabled();
-        boolean useVarLengthDictionary = dictionaryIndexConfig.getUseVarLengthDictionary()
-            || DictionaryIndexType.optimizeTypeShouldUseVarLengthDictionary(storedType, columnProfile);
-        Object defaultNullValue = fieldSpec.getDefaultNullValue();
-        if (storedType == DataType.BYTES) {
-            defaultNullValue = new ByteArray((byte[]) defaultNullValue);
-        }
-        
-        _indexCreationInfoMap.put(column,
-            new ColumnIndexCreationInfo(columnProfile, createDictionary, useVarLengthDictionary, false, defaultNullValue));
+      String column = fieldSpec.getName();
+      DataType storedType = fieldSpec.getDataType().getStoredType();
+      ColumnStatistics columnProfile = _segmentStats.getColumnProfileFor(column);
+      DictionaryIndexConfig dictionaryIndexConfig = indexConfigsMap.get(column).getConfig(StandardIndexes.dictionary());
+      boolean createDictionary = dictionaryIndexConfig.isDisabled();
+      boolean useVarLengthDictionary = dictionaryIndexConfig.getUseVarLengthDictionary()
+          || DictionaryIndexType.optimizeTypeShouldUseVarLengthDictionary(storedType, columnProfile);
+      Object defaultNullValue = fieldSpec.getDefaultNullValue();
+      if (storedType == DataType.BYTES) {
+        defaultNullValue = new ByteArray((byte[]) defaultNullValue);
+      }
+      _indexCreationInfoMap.put(column,
+          new ColumnIndexCreationInfo(columnProfile, createDictionary, useVarLengthDictionary, false/*isAutoGenerated*/,
+              defaultNullValue));
     }
-    
     _segmentIndexCreationInfo.setTotalDocs(_totalDocs);
     _totalStatsCollectorTimeNs = System.nanoTime() - statsCollectorStartTime;
-    
-    System.out.println("=== collectStatsAndIndexCreationInfo: END ===");
-}
+  }
 
   /**
    * Uses config and column properties like storedType and length of elements to determine if

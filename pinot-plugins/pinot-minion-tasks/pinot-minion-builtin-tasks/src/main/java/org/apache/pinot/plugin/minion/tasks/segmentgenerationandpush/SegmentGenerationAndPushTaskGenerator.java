@@ -28,8 +28,8 @@ import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -178,7 +178,7 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
     String tableNameWithType = tableConfig.getTableName();
 
     // Override task configs from table with adhoc task configs.
-    Map<String, String> batchConfigMap = new LinkedHashMap<>();
+    Map<String, String> batchConfigMap = new HashMap<>();
     TableTaskConfig tableTaskConfig = tableConfig.getTaskConfig();
     if (tableTaskConfig != null) {
       batchConfigMap.putAll(
@@ -239,7 +239,7 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
   }
 
   private Set<String> getInputFilesFromRunningTasks(String tableName) {
-    Set<String> inputFilesFromRunningTasks = new LinkedHashSet<>();
+    Set<String> inputFilesFromRunningTasks = new HashSet<>();
     TaskGeneratorUtils
         .forRunningTasks(tableName, MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE, _clusterInfoAccessor,
             taskConfig -> {
@@ -262,7 +262,7 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
     }
     String pushMode = IngestionConfigUtils.getPushMode(batchConfigMap);
 
-    Map<String, String> singleFileGenerationTaskConfig = new LinkedHashMap<>(batchConfigMap);
+    Map<String, String> singleFileGenerationTaskConfig = new HashMap<>(batchConfigMap);
     singleFileGenerationTaskConfig
         .put(BatchConfigProperties.TABLE_NAME, tableName);
     singleFileGenerationTaskConfig.put(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY, inputFileURI.toString());
@@ -374,7 +374,7 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
   }
 
   private Set<String> getExistingSegmentInputFiles(List<SegmentZKMetadata> segmentsZKMetadata) {
-    Set<String> existingSegmentInputFiles = new LinkedHashSet<>();
+    Set<String> existingSegmentInputFiles = new HashSet<>();
     for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
       Map<String, String> customMap = segmentZKMetadata.getCustomMap();
       if (customMap != null && customMap.containsKey(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY)) {

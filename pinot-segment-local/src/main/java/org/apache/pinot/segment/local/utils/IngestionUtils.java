@@ -22,7 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -320,7 +320,7 @@ public final class IngestionUtils {
       return Set.of();
     }
 
-    Set<String> fields = new LinkedHashSet<>();
+    Set<String> fields = new HashSet<>();
     if (ingestionConfig != null) {
       List<AggregationConfig> aggregationConfigs = ingestionConfig.getAggregationConfigs();
       if (aggregationConfigs != null) {
@@ -345,7 +345,7 @@ public final class IngestionUtils {
       return fieldsToRead;
     }
     ComplexTypeConfig complexTypeConfig = ingestionConfig.getComplexTypeConfig();
-    Set<String> result = new LinkedHashSet<>();
+    Set<String> result = new HashSet<>();
     String delimiter = complexTypeConfig.getDelimiter() == null ? ComplexTypeTransformer.DEFAULT_DELIMITER
         : complexTypeConfig.getDelimiter();
     for (String field : fieldsToRead) {

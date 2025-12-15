@@ -23,8 +23,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
@@ -272,12 +272,12 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
 
     // Construct a new TransformOperator to fetch the non-order-by expressions for the top rows
     List<ExpressionContext> nonOrderByExpressions = _expressions.subList(numOrderByExpressions, numExpressions);
-    Set<String> columns = new LinkedHashSet<>();
+    Set<String> columns = new HashSet<>();
     for (ExpressionContext expressionContext : nonOrderByExpressions) {
       expressionContext.getColumns(columns);
     }
     int numColumns = columns.size();
-    Map<String, DataSource> dataSourceMap = new LinkedHashMap<>();
+    Map<String, DataSource> dataSourceMap = new HashMap<>();
     for (String column : columns) {
       dataSourceMap.put(column, _indexSegment.getDataSource(column, _queryContext.getSchema()));
     }
