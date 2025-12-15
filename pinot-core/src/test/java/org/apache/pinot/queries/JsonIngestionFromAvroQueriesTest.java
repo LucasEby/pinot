@@ -279,8 +279,10 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
 
   /**
    * Compares two JSON strings structurally, ignoring object key ordering.
+   * @param actual The JSON string produced by the code under test
+   * @param expected The expected JSON string structure
    */
-  private void assertJsonEquals(String expected, String actual) {
+  private void assertJsonEquals(String actual, String expected) {
     try {
       JsonNode expectedNode = JSON_MAPPER.readTree(expected);
       JsonNode actualNode = JSON_MAPPER.readTree(actual);
@@ -323,7 +325,7 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
       Assert.assertEquals(row[3], expected[3]);
       
       // Compare JSON column structurally
-      assertJsonEquals((String) expected[2], row[2].toString());
+      assertJsonEquals(row[2].toString(), (String) expected[2]);
     }
   }
 
@@ -398,8 +400,10 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
         "[[{\"data\":{\"a\":\"7\",\"b\":\"14\"},\"timestamp\":1719390727}]]");
 
     int index = 0;
-    for (Object[] row : rows) {
-      assertJsonEquals(expecteds.get(index++), row[0].toString());
+    Iterator<Object[]> iterator = rows.iterator();
+    while (iterator.hasNext()) {
+      Object[] row = iterator.next();
+      assertJsonEquals(Arrays.toString(row), expecteds.get(index++));
     }
   }
 
