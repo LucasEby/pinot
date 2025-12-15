@@ -22,8 +22,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -64,8 +64,8 @@ public class GenericRow implements Serializable {
   /// TODO: Remove this special key and change decoder interface to return a list of records instead of a single record.
   public static final String SKIP_RECORD_KEY = "$SKIP_RECORD_KEY$";
 
-  private final Map<String, Object> _fieldToValueMap = new LinkedHashMap<>();
-  private final Set<String> _nullValueFields = new LinkedHashSet<>();
+  private final Map<String, Object> _fieldToValueMap = new HashMap<>();
+  private final Set<String> _nullValueFields = new HashSet<>();
   private boolean _incomplete;
   private boolean _sanitized;
 
@@ -73,28 +73,12 @@ public class GenericRow implements Serializable {
    * Initializes the generic row from the given generic row (shallow copy). The row should be new created or cleared
    * before calling this method.
    */
-  // public void init(GenericRow row) {
-  //   _fieldToValueMap.putAll(row._fieldToValueMap);
-  //   _nullValueFields.addAll(row._nullValueFields);
-  //   _incomplete = row._incomplete;
-  //   _sanitized = row._sanitized;
-  // }
-
   public void init(GenericRow row) {
     _fieldToValueMap.putAll(row._fieldToValueMap);
     _nullValueFields.addAll(row._nullValueFields);
     _incomplete = row._incomplete;
     _sanitized = row._sanitized;
-    
-    // DIAGNOSTIC
-    System.err.println("INIT CALLED - Copying " + row._fieldToValueMap.size() + " fields");
-    for (Map.Entry<String, Object> entry : _fieldToValueMap.entrySet()) {
-        System.err.println("  Field: " + entry.getKey() + 
-                           ", Value: " + entry.getValue() + 
-                           ", ValueIdentity: " + System.identityHashCode(entry.getValue()) +
-                           ", SourceIdentity: " + System.identityHashCode(row._fieldToValueMap.get(entry.getKey())));
-    }
-}
+  }
 
   /**
    * Returns the map from fields to values.
@@ -168,25 +152,13 @@ public class GenericRow implements Serializable {
   /**
    * @return a deep copy of the generic row
    */
-  // public GenericRow copy() {
-  //   GenericRow copy = new GenericRow();
-  //   copy.init(this);
-  //   for (Map.Entry<String, Object> entry : copy._fieldToValueMap.entrySet()) {
-  //     entry.setValue(copy(entry.getValue()));
-  //   }
-  //   return copy;
-  // }
-
   public GenericRow copy() {
-      GenericRow copy = new GenericRow();
-      // Don't use init() - build directly with deep copies
-      for (Map.Entry<String, Object> entry : _fieldToValueMap.entrySet()) {
-          copy._fieldToValueMap.put(entry.getKey(), copy(entry.getValue()));
-      }
-      copy._nullValueFields.addAll(_nullValueFields);
-      copy._incomplete = _incomplete;
-      copy._sanitized = _sanitized;
-      return copy;
+    GenericRow copy = new GenericRow();
+    copy.init(this);
+    for (Map.Entry<String, Object> entry : copy._fieldToValueMap.entrySet()) {
+      entry.setValue(copy(entry.getValue()));
+    }
+    return copy;
   }
 
   /**
@@ -207,7 +179,7 @@ public class GenericRow implements Serializable {
     if (value == null) {
       return null;
     } else if (value instanceof Map) {
-      Map<String, Object> map = new LinkedHashMap<>((Map<String, Object>) value);
+      Map<String, Object> map = new HashMap<>((Map<String, Object>) value);
       for (Map.Entry<String, Object> entry : map.entrySet()) {
         entry.setValue(copy(entry.getValue()));
       }

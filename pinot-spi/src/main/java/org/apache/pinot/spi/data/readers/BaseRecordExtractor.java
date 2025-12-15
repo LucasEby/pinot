@@ -104,19 +104,9 @@ public abstract class BaseRecordExtractor<T> implements RecordExtractor<T> {
     int numValues = collection.size();
     Object[] convertedValues = new Object[numValues];
     int index = 0;
-    // System.out.println("CONVERT COLLECTION CALLED HERE");
     for (Object value : collection) {
       Object convertedValue = value != null ? convert(value) : null;
       convertedValues[index++] = convertedValue;
-      // This didn't find anything:
-      // System.out.println("Converted value: " + convertedValue);
-      // if (convertedValue instanceof LinkedHashMap<?, ?>) {
-      //     LinkedHashMap<?, ?> map = (LinkedHashMap<?, ?>) convertedValue;
-      //     System.out.println("LinkedHashMap contents:");
-      //     for (Map.Entry<?, ?> entry : map.entrySet()) {
-      //         System.out.println(entry.getKey() + " = " + entry.getValue());
-      //     }
-      // }
     }
     return convertedValues;
   }
@@ -156,7 +146,7 @@ public abstract class BaseRecordExtractor<T> implements RecordExtractor<T> {
    */
   protected Map<Object, Object> convertMap(Object value) {
     Map<Object, Object> map = (Map) value;
-    Map<Object, Object> convertedMap = Maps.newLinkedHashMapWithExpectedSize(map.size());
+    Map<Object, Object> convertedMap = Maps.newHashMapWithExpectedSize(map.size());
     for (Map.Entry<Object, Object> entry : map.entrySet()) {
       Object mapKey = entry.getKey();
       if (mapKey != null) {
@@ -165,10 +155,6 @@ public abstract class BaseRecordExtractor<T> implements RecordExtractor<T> {
         convertedMap.put(convertSingleValue(entry.getKey()), convertedMapValue);
       }
     }
-    String result = convertedMap.toString();  // Or however it converts
-    System.out.println("Map.toString() called: " + result +
-            " (result identity: " + System.identityHashCode(result) +
-            ", map identity: " + System.identityHashCode(convertedMap) + ")");
     return convertedMap;
   }
 
