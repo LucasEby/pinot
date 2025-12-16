@@ -36,6 +36,7 @@ public class CommonConstants {
   public static final String DEFAULT_FAILURE_DOMAIN = "No such domain";
 
   public static final String PREFIX_OF_SSL_SUBSET = "ssl";
+  public static final String CONFIG_OF_SSL_USE_RENEWABLE_CONTEXT = "ssl.use.renewable.context";
   public static final String HTTP_PROTOCOL = "http";
   public static final String HTTPS_PROTOCOL = "https";
 
@@ -596,6 +597,9 @@ public class CommonConstants {
     @Deprecated
     public static final int FALLBACK_REPLICA_GROUP_ID = -1;
 
+    public static final String CONFIG_OF_BROKER_QUERY_ENABLE_AUTO_REWRITE_AGGREGATION_TYPE =
+        "pinot.broker.query.enable.auto.rewrite.aggregation.type";
+
     public static class Request {
       public static final String SQL = "sql";
       public static final String SQL_V1 = "sqlV1";
@@ -662,9 +666,6 @@ public class CommonConstants {
         public static final String CHUNK_SIZE_EXTRACT_FINAL_RESULT = "chunkSizeExtractFinalResult";
 
         public static final String NUM_REPLICA_GROUPS_TO_QUERY = "numReplicaGroupsToQuery";
-
-        @Deprecated
-        public static final String ORDERED_PREFERRED_REPLICAS = "orderedPreferredReplicas";
         public static final String ORDERED_PREFERRED_POOLS = "orderedPreferredPools";
         public static final String USE_FIXED_REPLICA = "useFixedReplica";
         public static final String EXPLAIN_PLAN_VERBOSE = "explainPlanVerbose";
@@ -735,6 +736,11 @@ public class CommonConstants {
         public static final String REGEX_DICT_SIZE_THRESHOLD = "regexDictSizeThreshold";
 
         public static final String DROP_RESULTS = "dropResults";
+
+        // Exclude virtual columns (columns starting with '$') from table schema
+        // This is typically used for NATURAL JOIN operations where virtual columns
+        // should not participate in join condition matching. Can only be used in MSE as of now
+        public static final String EXCLUDE_VIRTUAL_COLUMNS = "excludeVirtualColumns";
 
         // Maximum number of pending results blocks allowed in the streaming operator
         public static final String MAX_STREAMING_PENDING_BLOCKS = "maxStreamingPendingBlocks";
@@ -830,6 +836,14 @@ public class CommonConstants {
         // Option denoting the workloadName to which the query belongs. This is used to enforce resource budgets for
         // each workload if "Query Workload Isolation" feature enabled.
         public static final String WORKLOAD_NAME = "workloadName";
+
+        // Option to enable auto rewrite of certain aggregations based on input operand type. This can be enabled to
+        // improve performance and also avoid precision loss from default double based aggregations. This will be turned
+        // on by default in a future release. Examples of rewrites:
+        // MIN(longCol) -> MINLONG(longCol)
+        // MAX(stringCol) -> MAXSTRING(stringCol)
+        // SUM(intCol) -> SUMINT(intCol)
+        public static final String AUTO_REWRITE_AGGREGATION_TYPE = "autoRewriteAggregationType";
       }
 
       public static class QueryOptionValue {
@@ -900,8 +914,12 @@ public class CommonConstants {
         PlannerRuleNames.SORT_JOIN_TRANSPOSE,
         PlannerRuleNames.SORT_JOIN_COPY,
         PlannerRuleNames.AGGREGATE_UNION_AGGREGATE,
-        PlannerRuleNames.JOIN_TO_ENRICHED_JOIN
+        PlannerRuleNames.JOIN_TO_ENRICHED_JOIN,
+        PlannerRuleNames.AGGREGATE_FUNCTION_REWRITE,
+        PlannerRuleNames.JOIN_PUSH_TRANSITIVE_PREDICATES
     );
+
+    public static final String CONFIG_OF_BROKER_MSE_PLANNER_DISABLED_RULES = "pinot.broker.mse.planner.disabled.rules";
 
     public static class FailureDetector {
       public enum Type {
@@ -1034,6 +1052,9 @@ public class CommonConstants {
     public static final String USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA =
         "pinot.broker.use.mse.to.fill.empty.response.schema";
     public static final boolean DEFAULT_USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA = false;
+
+    public static final String USE_HTTP_STATUS_FOR_ERRORS_HEADER =
+        "Pinot-Use-Http-Status-For-Errors";
   }
 
   public static class Server {
@@ -1441,6 +1462,10 @@ public class CommonConstants {
     public static final boolean DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT = false;
     public static final boolean DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT = false;
 
+    // Predownload related configs
+    public static final String CONFIG_OF_PREDOWNLOAD_PARALLELISM = "pinot.server.predownload.parallelism";
+    public static final int DEFAULT_PREDOWNLOAD_PARALLELISM = -1; // Use numProcessors * 3 as default
+
     public static final String CONFIG_OF_CURRENT_DATA_TABLE_VERSION = "pinot.server.instance.currentDataTableVersion";
 
     // Environment Provider Configs
@@ -1756,6 +1781,7 @@ public class CommonConstants {
     public static final String INDEX_VERSION = "segment.index.version";
     public static final String TOTAL_DOCS = "segment.total.docs";
     public static final String CRC = "segment.crc";
+    public static final String DATA_CRC = "segment.data.crc";
     public static final String TIER = "segment.tier";
     public static final String CREATION_TIME = "segment.creation.time";
     public static final String PUSH_TIME = "segment.push.time";
@@ -2074,6 +2100,10 @@ public class CommonConstants {
         "pinot.field.spec.default.json.max.length.exceed.strategy";
     public static final String CONFIG_OF_DEFAULT_JSON_MAX_LENGTH =
         "pinot.field.spec.default.json.max.length";
+  }
+
+  public static class IngestionConfigs {
+    public static final int DEFAULT_INGESTION_EXCEPTION_LOG_RATE_LIMIT_PER_MIN = 5;
   }
 
   /**

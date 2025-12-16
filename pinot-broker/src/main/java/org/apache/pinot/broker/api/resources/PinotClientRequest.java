@@ -22,7 +22,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Multimap;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
@@ -156,7 +155,7 @@ public class PinotClientRequest {
       }
       BrokerResponse brokerResponse = executeSqlQuery(requestJson, makeHttpIdentity(requestContext), true, httpHeaders);
       brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
-      asyncResponse.resume(getPinotQueryResponse(brokerResponse));
+      asyncResponse.resume(getPinotQueryResponse(brokerResponse, httpHeaders));
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       asyncResponse.resume(wae);
@@ -193,7 +192,7 @@ public class PinotClientRequest {
           executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders, false,
               getCursor, numRows);
       brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
-      asyncResponse.resume(getPinotQueryResponse(brokerResponse));
+      asyncResponse.resume(getPinotQueryResponse(brokerResponse, httpHeaders));
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       asyncResponse.resume(wae);
@@ -229,7 +228,7 @@ public class PinotClientRequest {
       BrokerResponse brokerResponse =
           executeSqlQuery(requestJson, makeHttpIdentity(requestContext), true, httpHeaders, true);
       brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
-      asyncResponse.resume(getPinotQueryResponse(brokerResponse));
+      asyncResponse.resume(getPinotQueryResponse(brokerResponse, httpHeaders));
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       asyncResponse.resume(wae);
@@ -266,7 +265,7 @@ public class PinotClientRequest {
           executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders, true,
               getCursor, numRows);
       brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
-      asyncResponse.resume(getPinotQueryResponse(brokerResponse));
+      asyncResponse.resume(getPinotQueryResponse(brokerResponse, httpHeaders));
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       asyncResponse.resume(wae);
@@ -524,7 +523,7 @@ public class PinotClientRequest {
       return new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage());
     }
     if (forceUseMultiStage) {
-      sqlNodeAndOptions.setExtraOptions(ImmutableMap.of(Request.QueryOptionKey.USE_MULTISTAGE_ENGINE, "true"));
+      sqlNodeAndOptions.setExtraOptions(Map.of(Request.QueryOptionKey.USE_MULTISTAGE_ENGINE, "true"));
     }
     if (getCursor) {
       if (numRows == 0) {
@@ -532,7 +531,7 @@ public class PinotClientRequest {
             CommonConstants.CursorConfigs.DEFAULT_CURSOR_FETCH_ROWS);
       }
       sqlNodeAndOptions.setExtraOptions(
-          ImmutableMap.of(Request.QueryOptionKey.GET_CURSOR, "true", Request.QueryOptionKey.CURSOR_NUM_ROWS,
+          Map.of(Request.QueryOptionKey.GET_CURSOR, "true", Request.QueryOptionKey.CURSOR_NUM_ROWS,
               Integer.toString(numRows)));
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.CURSOR_QUERIES_GLOBAL, 1);
     }
@@ -588,20 +587,34 @@ public class PinotClientRequest {
    * Generate Response object from the BrokerResponse object with 'X-Pinot-Error-Code' header value
    *
    * If the query is successful the 'X-Pinot-Error-Code' header value is set to -1
-   * otherwise, the first error code of the broker response exception array will become the header value
+   * otherwise, the first error code of the broker response exception array will become the header value.
    *
-   * @param brokerResponse
+   * By default, returns HTTP 200 OK even for errors. If the request header
+   * 'Pinot-Use-Http-Status-For-Errors' is set to 'true', returns appropriate HTTP status
+   * codes based on the error type from QueryErrorCode.getHttpResponseStatus().
+   *
+   * @param brokerResponse The broker response containing query results or errors
+   * @param httpHeaders The HTTP headers from the request
    * @return Response
    * @throws Exception
    */
   @VisibleForTesting
-  public static Response getPinotQueryResponse(BrokerResponse brokerResponse)
+  public static Response getPinotQueryResponse(BrokerResponse brokerResponse, HttpHeaders httpHeaders)
       throws Exception {
     int queryErrorCodeHeaderValue = -1; // default value of the header.
+    Response.Status httpStatus = Response.Status.OK;
+
     List<QueryProcessingException> exceptions = brokerResponse.getExceptions();
     if (!exceptions.isEmpty()) {
       // set the header value as first exception error code value.
       queryErrorCodeHeaderValue = exceptions.get(0).getErrorCode();
+
+      // Check if the client wants actual HTTP error codes instead of 200 OK
+      if (Boolean.parseBoolean(httpHeaders.getHeaderString(
+          CommonConstants.Broker.USE_HTTP_STATUS_FOR_ERRORS_HEADER))) {
+        QueryErrorCode queryErrorCode = QueryErrorCode.fromErrorCode(queryErrorCodeHeaderValue);
+        httpStatus = queryErrorCode.getHttpResponseStatus();
+      }
 
       // do log with the exception flagged with a particular marker for filtering
       MDC.put("queryErrorCode", Integer.toString(queryErrorCodeHeaderValue));
@@ -614,8 +627,8 @@ public class PinotClientRequest {
       MDC.remove("queryErrorCode");
     }
 
-    // returning the Response with OK status and header value.
-    return Response.ok()
+    // returning the Response with appropriate status and header value.
+    return Response.status(httpStatus)
         .header(PINOT_QUERY_ERROR_CODE_HEADER, queryErrorCodeHeaderValue)
         .entity((StreamingOutput) brokerResponse::toOutputStream).type(MediaType.APPLICATION_JSON)
         .build();
